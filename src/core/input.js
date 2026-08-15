@@ -35,6 +35,18 @@ const TAP_TTL = 320;     // ms. 이 안에 아무 버튼도 먹지 않으면 버
 // (좌표로 중복을 걸러내면 같은 버튼 연타까지 막혀서 pointerId 로 짝을 짓는다)
 const tappedDown = new Set();
 
+// 화면에 닿아 있는 모든 포인터.
+const activePointers = new Set();
+
+/**
+ * 이 포인터의 pointerup 은 탭으로 치지 않는다.
+ *
+ * 전투 중 조이스틱을 잡고 있다가 레벨업이 뜨면, 손을 떼는 pointerup 이
+ * "화면 왼쪽 탭"으로 변환되어 첫 카드가 제멋대로 선택됐다. 상태가 바뀌는 순간
+ * 이미 닿아 있던 손가락은 새 화면에 대한 입력 의사가 아니므로 전부 무시한다.
+ */
+const ignoreUntilUp = new Set();
+
 function pushTap(x, y) {
   input.taps.push({ x, y, t: performance.now(), used: false });
   if (input.taps.length > 8) input.taps.shift();
@@ -91,12 +103,15 @@ export function initInput(cv, blurHandler) {
     touchStick = null;
     dashTouchId = null;
     tappedDown.clear();
+    activePointers.clear();
+    ignoreUntilUp.clear();
     if (onBlur) onBlur();
   });
 
   cv.addEventListener('pointerdown', e => {
     const p = toCanvas(e);
     input.lastEvent = `down ${e.pointerType} ${Math.round(p.x)},${Math.round(p.y)}`;
+    activePointers.add(e.pointerId);
 
     if (e.pointerType === 'touch' && input.gameplay) {
       // 전투 중 터치는 조작기다. 스틱 손가락이 UI 포인터를 끌고 다니면 안 되므로
@@ -141,6 +156,13 @@ export function initInput(cv, blurHandler) {
 
   const release = e => {
     input.lastEvent = `${e.type} ${e.pointerType}`;
+    activePointers.delete(e.pointerId);
+
+    // 상태가 바뀔 때 이미 닿아 있던 손가락 — 떼는 동작을 탭으로 오인하지 않는다
+    if (ignoreUntilUp.delete(e.pointerId)) {
+      tappedDown.delete(e.pointerId);
+      return;
+    }
     if (touchStick && touchStick.id === e.pointerId) { touchStick = null; return; }
     if (dashTouchId === e.pointerId) { dashTouchId = null; return; }
     input.pointer.down = false;
@@ -231,8 +253,12 @@ export function isDashHeld() {
 
 /** 상태가 바뀔 때 조작 중이던 터치를 정리한다. */
 export function clearTouchState() {
+  // 지금 화면에 닿아 있는 손가락은 새 화면을 누르려던 게 아니다.
+  // 떼는 순간이 탭으로 오인되지 않도록 표시해 둔다.
+  for (const id of activePointers) ignoreUntilUp.add(id);
   touchStick = null;
   dashTouchId = null;
   dashQueued = false;
   tappedDown.clear();
+  input.taps.length = 0;    // 전환 직전에 쌓인 탭도 새 화면으로 넘기지 않는다
 }

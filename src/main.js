@@ -1,6 +1,7 @@
 // 엔트리: 캔버스 셋업, 고정 타임스텝 루프, 상태 머신.
 
-import { W, H, STEP, MAX_FRAME, SETTINGS, RUN_LENGTH, IS_TOUCH, MAX_DPR, C } from './config.js';
+import * as cfg from './config.js';
+import { STEP, MAX_FRAME, SETTINGS, RUN_LENGTH, IS_TOUCH, MAX_DPR, C, setViewport } from './config.js';
 import { initInput, pollInput, endFrameInput, input, keyPressed, clearTouchState } from './core/input.js';
 import { initAudio, resumeAudio, setMuted, sfx, startMusic, stopMusic, updateMusic, setMusicIntensity } from './core/audio.js';
 import { loadSave, persist, resetSave } from './core/save.js';
@@ -21,17 +22,22 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 function fitCanvas() {
-  // 모바일 GPU 는 픽셀 수에 민감하다. DPR 을 1.5 로 묶어 렌더 면적을 절반 가까이 줄인다.
+  // 화면 비율에 맞춰 논리 폭을 조정한다 (높이는 720 고정).
+  // 16:9 로 고정하면 20:9 폰에서 좌우에 검은 띠가 생겨 화면이 20% 가까이 낭비된다.
+  setViewport(window.innerWidth, window.innerHeight);
+
+  // 모바일 GPU 는 픽셀 수에 민감하다. DPR 을 1.5 로 묶어 렌더 면적을 줄인다.
   const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
+  canvas.width = cfg.W * dpr;
+  canvas.height = cfg.H * dpr;
+  canvas.style.aspectRatio = `${cfg.W} / ${cfg.H}`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 }
 fitCanvas();
 addEventListener('resize', fitCanvas);
-addEventListener('orientationchange', fitCanvas);
+addEventListener('orientationchange', () => setTimeout(fitCanvas, 120));
 
 /** 세로로 들면 16:9 화면이 손톱만해진다. 가로를 요구한다. */
 function isPortrait() {
@@ -40,9 +46,9 @@ function isPortrait() {
 
 function renderRotateNotice() {
   ctx.fillStyle = C.bg;
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, cfg.W, cfg.H);
   ctx.save();
-  ctx.translate(W / 2, H / 2);
+  ctx.translate(cfg.W / 2, cfg.H / 2);
   ctx.strokeStyle = C.cyan;
   ctx.lineWidth = 4;
   ctx.shadowColor = C.cyan;
@@ -57,7 +63,7 @@ function renderRotateNotice() {
   ctx.font = '26px ui-monospace, monospace';
   ctx.fillStyle = C.text;
   ctx.textAlign = 'center';
-  ctx.fillText('기기를 가로로 돌려주세요', W / 2, H / 2 + 190);
+  ctx.fillText('기기를 가로로 돌려주세요', cfg.W / 2, cfg.H / 2 + 190);
 }
 
 const save = loadSave();
@@ -95,6 +101,29 @@ function beginRun() {
   state = S.PLAYING;
   startMusic();
   wakeAudio();
+  requestFullscreenIfMobile();
+}
+
+/**
+ * 모바일에서 판을 시작할 때 전체화면으로 들어간다.
+ * 주소창과 하단 바가 세로 공간을 크게 갉아먹어, 없애는 것만으로 화면이 눈에 띄게 커진다.
+ * 전체화면 요청은 사용자 제스처 안에서만 허용되므로 버튼 처리 흐름에서 호출한다.
+ * 실패해도(iPhone Safari 등) 게임은 그대로 진행된다.
+ */
+function requestFullscreenIfMobile() {
+  if (!IS_TOUCH || document.fullscreenElement) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try {
+    const r = req.call(el, { navigationUI: 'hide' });
+    if (r && r.catch) r.catch(() => {});
+  } catch { /* 사용자 제스처 밖이거나 미지원 — 무시 */ }
+  // 화면 회전 잠금까지 되면 더 좋지만, 되는 기기에서만 조용히 시도한다
+  if (screen.orientation && screen.orientation.lock) {
+    const p = screen.orientation.lock('landscape');
+    if (p && p.catch) p.catch(() => {});
+  }
 }
 
 function endRun(victory) {
@@ -177,11 +206,11 @@ function renderInputDebug() {
   ];
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.72)';
-  ctx.fillRect(8, H - 8 - lines.length * 20 - 8, 560, lines.length * 20 + 12);
+  ctx.fillRect(8, cfg.H - 8 - lines.length * 20 - 8, 560, lines.length * 20 + 12);
   ctx.font = '15px ui-monospace, monospace';
   ctx.fillStyle = '#8cff3d';
   ctx.textAlign = 'left';
-  lines.forEach((l, i) => ctx.fillText(l, 16, H - 16 - (lines.length - 1 - i) * 20));
+  lines.forEach((l, i) => ctx.fillText(l, 16, cfg.H - 16 - (lines.length - 1 - i) * 20));
   // 최근 탭 위치에 표식
   for (const t of input.taps) {
     ctx.strokeStyle = t.used ? '#8cff3d' : '#ff3b3b';
@@ -335,7 +364,8 @@ requestAnimationFrame(frame);
 
 // 디버그 훅 — 콘솔에서 밸런싱을 확인할 때 쓴다
 window.NP = {
-  world, save, input, settings: SETTINGS, particles,
+  world, save, input, settings: SETTINGS, particles, cfg,
+  get viewport() { return { W: cfg.W, H: cfg.H, touchUI: { ...cfg.TOUCH_UI } }; },
   get state() { return state; },
   start: beginRun,
   skipTo(sec) { world.t = sec; },

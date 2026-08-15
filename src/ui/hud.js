@@ -1,4 +1,7 @@
 // 인게임 오버레이.
+//
+// 터치 기기에서는 체력바와 로드아웃을 상단에 둔다. 하단은 조이스틱과 대시 버튼을
+// 쥔 손에 가려져서, 정작 가장 자주 봐야 할 체력이 안 보인다.
 
 import { W, H, C, RUN_LENGTH, IS_TOUCH, TOUCH_UI } from '../config.js';
 import { WEAPONS } from '../data/weapons.js';
@@ -19,43 +22,22 @@ export function renderHud(ctx, world) {
     size: 30, align: 'center', color: C.text, glow: 10,
   });
 
-  // 좌상단: 레벨 / 처치
-  text(ctx, `LV ${p.level}`, 18, 32, { size: 20, color: C.lime, glow: 6 });
-  text(ctx, `처치 ${world.kills}`, 18, 54, { size: 15, color: C.dim });
-
-  // 우상단: 남은 시간 안내 (터치에서는 일시정지 버튼 자리를 비켜 왼쪽으로)
-  const remain = Math.max(0, RUN_LENGTH - world.t);
-  if (!world.boss) {
-    text(ctx, `정화까지 ${formatTime(remain)}`, W - (IS_TOUCH ? 84 : 18), 32, {
-      size: 15, align: 'right', color: C.dim,
-    });
-  }
-
-  // 좌하단: 체력
-  const hpW = 260;
-  bar(ctx, 18, H - 40, hpW, 16, p.hp / p.stats.maxHp, C.cyan, '#141a30');
-  text(ctx, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`, 18 + hpW / 2, H - 32, {
-    size: 13, align: 'center', baseline: 'middle', color: '#04121a',
-  });
-  if (p.revives > 0) {
-    text(ctx, `백업 ×${p.revives}`, 18, H - 50, { size: 13, color: C.gold });
-  }
-
-  // 우하단: 보유 무기 / 패시브
-  drawLoadout(ctx, p);
+  if (IS_TOUCH) renderTouchHud(ctx, world);
+  else renderDesktopHud(ctx, world);
 
   // 보스 체력 바
   if (world.boss && world.boss.alive) {
-    const bw = W * 0.6;
+    const bw = W * 0.5;
     const bx = (W - bw) / 2;
-    text(ctx, world.boss.def.name, W / 2, 60, { size: 16, align: 'center', color: C.orange });
-    bar(ctx, bx, 70, bw, 12, world.boss.hp / world.boss.maxHp, C.orange, '#2a1208');
+    const by = IS_TOUCH ? 96 : 60;
+    text(ctx, world.boss.def.name, W / 2, by, { size: 16, align: 'center', color: C.orange });
+    bar(ctx, bx, by + 10, bw, 12, world.boss.hp / world.boss.maxHp, C.orange, '#2a1208');
   }
 
   // 배너
   if (world.banner) {
     const a = Math.min(1, world.banner.life / 0.5);
-    text(ctx, world.banner.text, W / 2, H * 0.3, {
+    text(ctx, world.banner.text, W / 2, H * 0.32, {
       size: 40, align: 'center', color: C.orange, glow: 20, alpha: a,
     });
   }
@@ -66,14 +48,64 @@ export function renderHud(ctx, world) {
   }
 }
 
-function drawLoadout(ctx, p) {
+function renderDesktopHud(ctx, world) {
+  const p = world.player;
+
+  text(ctx, `LV ${p.level}`, 18, 32, { size: 20, color: C.lime, glow: 6 });
+  text(ctx, `처치 ${world.kills}`, 18, 54, { size: 15, color: C.dim });
+
+  const remain = Math.max(0, RUN_LENGTH - world.t);
+  if (!world.boss) {
+    text(ctx, `정화까지 ${formatTime(remain)}`, W - 18, 32, {
+      size: 15, align: 'right', color: C.dim,
+    });
+  }
+
+  const hpW = 260;
+  bar(ctx, 18, H - 40, hpW, 16, p.hp / p.stats.maxHp, C.cyan, '#141a30');
+  text(ctx, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`, 18 + hpW / 2, H - 32, {
+    size: 13, align: 'center', baseline: 'middle', color: '#04121a',
+  });
+  if (p.revives > 0) {
+    text(ctx, `백업 ×${p.revives}`, 18, H - 50, { size: 13, color: C.gold });
+  }
+
+  drawLoadout(ctx, p, W - 18, H - 76, H - 32);
+}
+
+function renderTouchHud(ctx, world) {
+  const p = world.player;
+
+  // 좌상단: 체력바 + 레벨 + 처치
+  const hpW = 240;
+  bar(ctx, 16, 18, hpW, 18, p.hp / p.stats.maxHp, C.cyan, '#141a30');
+  text(ctx, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`, 16 + hpW / 2, 27, {
+    size: 13, align: 'center', baseline: 'middle', color: '#04121a',
+  });
+  text(ctx, `LV ${p.level}`, 16, 56, { size: 17, color: C.lime, glow: 6 });
+  text(ctx, `처치 ${world.kills}`, 90, 56, { size: 14, color: C.dim });
+  if (p.revives > 0) {
+    text(ctx, `백업 ×${p.revives}`, 170, 56, { size: 13, color: C.gold });
+  }
+
+  // 우상단: 로드아웃 2줄
+  drawLoadout(ctx, p, W - 16, 34, 78);
+
+  // 남은 시간은 타이머 아래에 작게
+  const remain = Math.max(0, RUN_LENGTH - world.t);
+  if (!world.boss) {
+    text(ctx, `정화까지 ${formatTime(remain)}`, W / 2, 56, {
+      size: 13, align: 'center', color: C.dim,
+    });
+  }
+}
+
+/** 무기 줄(yW)과 강화 줄(yP)을 오른쪽 끝(rightX)부터 왼쪽으로 채운다. */
+function drawLoadout(ctx, p, rightX, yW, yP) {
   const size = 34;
   const gap = 6;
-  // 터치에서는 우하단이 대시 버튼 자리다. 로드아웃을 위로 올린다.
-  let x = W - 18 - size / 2;
-  const yW = IS_TOUCH ? H - 208 : H - 76;
-  const yP = IS_TOUCH ? H - 164 : H - 32;
 
+  let x = rightX - size / 2;
   for (let i = p.weapons.length - 1; i >= 0; i--) {
     const w = p.weapons[i];
     const def = WEAPONS[w.id];
@@ -82,7 +114,7 @@ function drawLoadout(ctx, p) {
     x -= size + gap;
   }
 
-  x = W - 18 - size / 2;
+  x = rightX - size / 2;
   for (const id in p.passives) {
     const def = PASSIVES[id];
     icon(ctx, def.icon, x, yP, size / 2 - 3, def.color);
@@ -97,7 +129,6 @@ function drawTouchControls(ctx, world) {
   const ready = p.dashCd <= 0;
 
   ctx.save();
-  // 대시 버튼
   ctx.globalAlpha = isDashHeld() ? 0.5 : ready ? 0.32 : 0.16;
   ctx.fillStyle = C.cyan;
   disc(ctx, TOUCH_UI.dashX, TOUCH_UI.dashY, TOUCH_UI.dashR);
@@ -106,7 +137,6 @@ function drawTouchControls(ctx, world) {
   ctx.lineWidth = 2;
   circle(ctx, TOUCH_UI.dashX, TOUCH_UI.dashY, TOUCH_UI.dashR);
 
-  // 쿨다운 게이지
   if (!ready) {
     ctx.globalAlpha = 0.85;
     ctx.lineWidth = 4;
@@ -122,9 +152,9 @@ function drawTouchControls(ctx, world) {
     color: ready ? C.text : C.dim,
   });
 
-  // 일시정지 버튼 (두 개의 세로 막대)
+  // 일시정지 (두 개의 세로 막대)
   ctx.save();
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.28;
   ctx.fillStyle = C.text;
   disc(ctx, TOUCH_UI.pauseX, TOUCH_UI.pauseY, TOUCH_UI.pauseR);
   ctx.globalAlpha = 0.95;

@@ -1,9 +1,31 @@
 // 전역 상수. 다른 어떤 모듈도 참조하지 않는다.
 
-export const W = 1280;
-export const H = 720;
+/**
+ * 논리 해상도. 높이는 720 으로 고정하고 폭만 화면 비율에 맞춘다.
+ *
+ * 16:9 로 못박아두면 20:9 인 요즘 폰에서 좌우에 검은 띠가 생겨 화면의 20% 가까이가
+ * 낭비된다. 폭을 늘리면 그만큼 더 넓게 보이고 띠가 사라진다.
+ *
+ * `let` + live binding 이라 import 한 쪽도 갱신된 값을 본다. 다만 모듈 로드 시점에
+ * 값을 복사해 두는 코드(상수 계산)는 setViewport 뒤에 다시 계산해야 한다.
+ */
+export let W = 1280;
+export let H = 720;
 export const STEP = 1 / 60;
 export const MAX_FRAME = 0.25;
+
+const MIN_W = 1280;   // 16:9
+const MAX_W = 1900;   // 그 이상 넓히면 적이 화면 밖에서 너무 오래 접근한다
+
+/** @returns {boolean} 폭이 실제로 바뀌었는가 */
+export function setViewport(cssW, cssH) {
+  if (!cssW || !cssH) return false;
+  const w = Math.round(Math.min(MAX_W, Math.max(MIN_W, H * (cssW / cssH))));
+  if (w === W) return false;
+  W = w;
+  refreshTouchUI();
+  return true;
+}
 
 export const C = {
   bg:      '#070711',
@@ -53,15 +75,20 @@ export const IS_TOUCH =
   matchMedia('(pointer: coarse)').matches &&
   (navigator.maxTouchPoints || 0) > 0;
 
-/** 터치 조작 UI 배치 (논리 좌표계 1280×720 기준) */
+/** 터치 조작 UI 배치. W 가 바뀌면 refreshTouchUI 로 다시 계산한다. */
 export const TOUCH_UI = {
-  dashX: W - 96,
-  dashY: H - 96,
-  dashR: 58,
-  pauseX: W - 44,
-  pauseY: 44,
-  pauseR: 26,
+  dashX: 0, dashY: 0, dashR: 58,
+  pauseX: 0, pauseY: 0, pauseR: 26,
 };
+
+export function refreshTouchUI() {
+  TOUCH_UI.dashX = W - 100;
+  TOUCH_UI.dashY = H - 100;
+  // 일시정지는 상단 중앙(타이머 옆). 손은 화면 아래쪽에 있으므로 여기가 안 가려진다.
+  TOUCH_UI.pauseX = W / 2 + 108;
+  TOUCH_UI.pauseY = 40;
+}
+refreshTouchUI();
 
 // 모바일 GPU 는 데스크톱보다 한참 느리다. 동시 적 수를 줄이고 픽셀도 덜 그린다.
 export const MOBILE_CAP_SCALE = 0.6;
