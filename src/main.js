@@ -97,8 +97,13 @@ function wakeAudio() {
   initAudio();
   resumeAudio();
 }
-addEventListener('pointerdown', wakeAudio, { once: true });
-addEventListener('keydown', wakeAudio, { once: true });
+
+// once 로 두면 한 번 잠든 뒤 영영 깨어나지 못한다 ("플레이 중 사운드가 갑자기 멈춤").
+// 브라우저는 탭 전환·화면 끄기·인터럽션으로 컨텍스트를 재우므로 계속 깨울 기회를 준다.
+addEventListener('pointerdown', wakeAudio);
+addEventListener('keydown', wakeAudio);
+addEventListener('visibilitychange', () => { if (!document.hidden) wakeAudio(); });
+addEventListener('focus', wakeAudio);
 
 function beginRun() {
   world.meta = save.upgrades;
