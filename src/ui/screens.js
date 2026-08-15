@@ -2,7 +2,7 @@
 
 import { W, H, C, SETTINGS, IS_TOUCH } from '../config.js';
 import { text, panel, button, icon, formatTime, levelDots } from './widgets.js';
-import { input, keyPressed } from '../core/input.js';
+import { input, keyPressed, consumeTap } from '../core/input.js';
 import { META, META_IDS } from '../data/meta.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PASSIVES, MAX_LEVEL } from '../data/passives.js';
@@ -146,6 +146,8 @@ export function renderLevelUp(ctx, world, choices, anim) {
   let x = (W - total) / 2;
   const y = 210;
   let picked = -1;
+  // 카드가 뜨자마자 눌리는 오폭을 막는다. 여기서 막아야 탭이 소비되지 않고 큐에 남는다.
+  const ready = anim > 0.15;
 
   for (let i = 0; i < choices.length; i++) {
     const c = choices[i];
@@ -173,7 +175,7 @@ export function renderLevelUp(ctx, world, choices, anim) {
 
     text(ctx, `[${i + 1}]`, x + cw / 2, y + ch - 22, { size: 15, align: 'center', color: '#4a5578' });
 
-    if ((hover && input.pointer.justPressed) || keyPressed(`Digit${i + 1}`)) picked = i;
+    if (ready && (consumeTap(x, y, cw, ch) || keyPressed(`Digit${i + 1}`))) picked = i;
     x += cw + gap;
   }
   return picked;

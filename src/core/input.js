@@ -1,6 +1,6 @@
 // 키보드 + 터치를 하나의 정규화된 입력으로 합친다.
 
-import { W, TOUCH_UI } from '../config.js';
+import { W, H, TOUCH_UI } from '../config.js';
 
 const keys = new Set();
 
@@ -15,7 +15,41 @@ export const input = {
   // (레벨업 카드를 고르려고 우측을 탭했는데 대시가 예약되는 일을 막는다)
   gameplay: false,
   pauseTapped: false,    // 모바일 일시정지 버튼
+
+  /**
+   * 미처리 탭 큐. { x, y, t, used }
+   *
+   * "이번 프레임에 눌렸는가"(justPressed) 하나로 클릭을 판정하면, 탭이 렌더 사이에
+   * 끼거나 프레임이 길어질 때 조용히 사라진다. 탭을 큐에 쌓아두고 버튼이 직접
+   * 소비하게 하면 프레임 타이밍과 무관하게 반드시 한 번 처리된다.
+   */
+  taps: [],
+
+  lastEvent: '',         // ?debug 진단용
 };
+
+const TAP_TTL = 320;     // ms. 이 안에 아무 버튼도 먹지 않으면 버린다
+
+// 이 포인터의 pointerdown 이 이미 탭을 만들었는가.
+// down 과 up 이 각각 탭을 넣으면 버튼이 두 번 눌리므로 한 쌍당 하나만 남긴다.
+// (좌표로 중복을 걸러내면 같은 버튼 연타까지 막혀서 pointerId 로 짝을 짓는다)
+const tappedDown = new Set();
+
+function pushTap(x, y) {
+  input.taps.push({ x, y, t: performance.now(), used: false });
+  if (input.taps.length > 8) input.taps.shift();
+}
+
+/** 지정한 사각형 안의 미처리 탭을 하나 소비한다. @returns {boolean} */
+export function consumeTap(x, y, w, h) {
+  for (const t of input.taps) {
+    if (!t.used && t.x >= x && t.x <= x + w && t.y >= y && t.y <= y + h) {
+      t.used = true;
+      return true;
+    }
+  }
+  return false;
+}
 
 let touchStick = null;   // { id, ox, oy, x, y }
 let dashTouchId = null;
@@ -56,11 +90,13 @@ export function initInput(cv, blurHandler) {
     keys.clear();
     touchStick = null;
     dashTouchId = null;
+    tappedDown.clear();
     if (onBlur) onBlur();
   });
 
   cv.addEventListener('pointerdown', e => {
     const p = toCanvas(e);
+    input.lastEvent = `down ${e.pointerType} ${Math.round(p.x)},${Math.round(p.y)}`;
 
     if (e.pointerType === 'touch' && input.gameplay) {
       // 전투 중 터치는 조작기다. 스틱 손가락이 UI 포인터를 끌고 다니면 안 되므로
@@ -87,6 +123,8 @@ export function initInput(cv, blurHandler) {
     input.pointer.y = p.y;
     input.pointer.down = true;
     input.pointer.justPressed = true;
+    pushTap(p.x, p.y);
+    tappedDown.add(e.pointerId);
   });
 
   cv.addEventListener('pointermove', e => {
@@ -102,9 +140,21 @@ export function initInput(cv, blurHandler) {
   });
 
   const release = e => {
+    input.lastEvent = `${e.type} ${e.pointerType}`;
     if (touchStick && touchStick.id === e.pointerId) { touchStick = null; return; }
     if (dashTouchId === e.pointerId) { dashTouchId = null; return; }
     input.pointer.down = false;
+
+    // pointerdown 이 이미 탭을 만들었으면 여기서는 넣지 않는다.
+    if (tappedDown.delete(e.pointerId)) return;
+
+    // down 이 제스처로 해석돼 취소되는 기기를 위한 폴백 — up 에서 탭을 확정한다.
+    if (e.pointerType === 'touch' && e.type === 'pointerup' && !input.gameplay) {
+      const p = toCanvas(e);
+      input.pointer.x = p.x;
+      input.pointer.y = p.y;
+      pushTap(p.x, p.y);
+    }
   };
   cv.addEventListener('pointerup', release);
   cv.addEventListener('pointercancel', release);
@@ -159,6 +209,12 @@ export function endFrameInput() {
   input.pauseTapped = false;
   input.pressed.clear();
   input.anyKey = false;
+
+  // 탭은 소비 여부와 무관하게 TTL 로만 만료시킨다 (pushTap 의 중복 검사가 이 기록에 의존)
+  const now = performance.now();
+  for (let i = input.taps.length - 1; i >= 0; i--) {
+    if (now - input.taps[i].t > TAP_TTL) input.taps.splice(i, 1);
+  }
 }
 
 export function keyPressed(code) {
@@ -178,4 +234,5 @@ export function clearTouchState() {
   touchStick = null;
   dashTouchId = null;
   dashQueued = false;
+  tappedDown.clear();
 }

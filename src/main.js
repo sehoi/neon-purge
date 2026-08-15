@@ -163,6 +163,36 @@ function update(dt) {
 }
 
 // ── 렌더 ────────────────────────────────────────────────────
+// ?debug 를 붙이면 입력 진단을 화면에 띄운다. 실기기에서만 나는 문제를 볼 수단이다.
+const DEBUG_INPUT = location.search.includes('debug');
+
+function renderInputDebug() {
+  const r = canvas.getBoundingClientRect();
+  const lines = [
+    `touch=${IS_TOUCH} portrait=${isPortrait()} state=${state}`,
+    `win=${innerWidth}x${innerHeight} dpr=${(window.devicePixelRatio || 1).toFixed(2)}`,
+    `rect=${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`,
+    `ptr=${Math.round(input.pointer.x)},${Math.round(input.pointer.y)} taps=${input.taps.length}`,
+    `last=${input.lastEvent || '(없음)'}`,
+  ];
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(8, H - 8 - lines.length * 20 - 8, 560, lines.length * 20 + 12);
+  ctx.font = '15px ui-monospace, monospace';
+  ctx.fillStyle = '#8cff3d';
+  ctx.textAlign = 'left';
+  lines.forEach((l, i) => ctx.fillText(l, 16, H - 16 - (lines.length - 1 - i) * 20));
+  // 최근 탭 위치에 표식
+  for (const t of input.taps) {
+    ctx.strokeStyle = t.used ? '#8cff3d' : '#ff3b3b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 22, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function render() {
   if (isPortrait()) { renderRotateNotice(); return; }
 
@@ -225,7 +255,7 @@ function render() {
       // 정상 흐름에서는 update 가 먼저 채우지만, 비어 있으면 즉석에서 뽑는다
       if (!choices) choices = buildChoices(world.player);
       const picked = renderLevelUp(ctx, world, choices, levelAnim);
-      if (picked >= 0 && levelAnim > 0.15) {
+      if (picked >= 0) {
         applyChoice(world.player, world, choices[picked]);
         sfx('select');
         choices = null;
@@ -253,6 +283,8 @@ function render() {
       break;
     }
   }
+
+  if (DEBUG_INPUT) renderInputDebug();
 }
 
 // ── 루프 ────────────────────────────────────────────────────

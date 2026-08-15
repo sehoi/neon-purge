@@ -1,7 +1,7 @@
 // UI 공용 그리기 + 히트테스트.
 
 import { C } from '../config.js';
-import { input } from '../core/input.js';
+import { input, consumeTap } from '../core/input.js';
 import { polygon, circle, disc, line, star } from '../render/shapes.js';
 import { TAU } from '../core/vec.js';
 
@@ -44,11 +44,12 @@ export function panel(ctx, x, y, w, h, color = C.cyan, alpha = 0.9) {
   ctx.restore();
 }
 
-/** @returns {boolean} 이번 프레임에 클릭되었는가 */
+/** @returns {boolean} 클릭되었는가 (미처리 탭 큐에서 소비한다) */
 export function button(ctx, x, y, w, h, label, opts = {}) {
   const p = input.pointer;
   const hover = p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
   const color = opts.color || C.cyan;
+  const clicked = consumeTap(x, y, w, h);
 
   ctx.save();
   ctx.fillStyle = hover ? 'rgba(0,240,255,0.12)' : 'rgba(10,14,28,0.9)';
@@ -65,7 +66,7 @@ export function button(ctx, x, y, w, h, label, opts = {}) {
     color: hover ? '#ffffff' : color,
   });
 
-  return hover && p.justPressed;
+  return clicked;
 }
 
 /** 무기/패시브 아이콘. 전부 도형으로 그린다. */

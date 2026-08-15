@@ -29,4 +29,10 @@ html, body {
   image-rendering: auto;
   cursor: crosshair;
   background: #070711;
+
+  /* touch-action 은 상속되지 않는다. body 에만 걸면 캔버스는 기본값(auto)이라
+     탭이 스크롤/줌 제스처로 해석되어 포인터 이벤트가 취소될 수 있다. */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
