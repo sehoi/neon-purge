@@ -75,6 +75,7 @@ export const SETTINGS = {
   glow: true,
   shake: 1.0,
   muted: false,
+  showFps: false,
 };
 
 /** 터치 조작 UI 배치. W 가 바뀌면 refreshTouchUI 로 다시 계산한다. */

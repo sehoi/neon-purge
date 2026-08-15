@@ -4,6 +4,7 @@ import { W, H, C, SETTINGS, IS_TOUCH } from '../config.js';
 import { text, panel, button, icon, formatTime, levelDots } from './widgets.js';
 import { input, keyPressed, consumeTap } from '../core/input.js';
 import { META, META_IDS } from '../data/meta.js';
+import { ACHIEVEMENTS } from '../data/achievements.js';
 import { WEAPONS } from '../data/weapons.js';
 import { PASSIVES, MAX_LEVEL } from '../data/passives.js';
 
@@ -25,16 +26,18 @@ export function renderTitle(ctx, save) {
     size: 17, align: 'center', color: C.dim,
   });
 
-  const bw = 300, bh = 54, bx = (W - bw) / 2;
+  const bw = 300, bh = 50, bx = (W - bw) / 2;
+  const done = save.achievements.length;
   const r = {
-    start:   button(ctx, bx, 300, bw, bh, '실행  ▶'),
-    upgrade: button(ctx, bx, 366, bw, bh, `업그레이드  (${save.fragments})`, { color: C.gold, size: 19 }),
-    help:    button(ctx, bx, 432, bw, bh, '조작법', { color: C.dim, size: 19 }),
+    start:   button(ctx, bx, 286, bw, bh, '실행  ▶'),
+    upgrade: button(ctx, bx, 344, bw, bh, `업그레이드  (${save.fragments})`, { color: C.gold, size: 18 }),
+    achievements: button(ctx, bx, 402, bw, bh, `업적  ${done}/${ACHIEVEMENTS.length}`, { color: C.violet, size: 18 }),
+    help:    button(ctx, bx, 460, bw, bh, '조작법', { color: C.dim, size: 18 }),
   };
   // 모바일은 주소창이 화면을 갉아먹는다. 전체화면으로 들어갈 수단을 준다.
   if (IS_TOUCH && document.fullscreenEnabled) {
-    r.fullscreen = button(ctx, bx, 498, bw, 44,
-      document.fullscreenElement ? '전체화면 해제' : '전체화면', { color: C.dim, size: 17 });
+    r.fullscreen = button(ctx, bx, 518, bw, 40,
+      document.fullscreenElement ? '전체화면 해제' : '전체화면', { color: C.dim, size: 16 });
   }
 
   if (save.best.kills > 0) {
@@ -125,8 +128,73 @@ export function renderMeta(ctx, save) {
   }
 
   result.back = button(ctx, px + 34, py + ph - 54, 160, 40, '돌아가기', { size: 17 });
-  result.reset = button(ctx, px + pw - 194, py + ph - 54, 160, 40, '초기화', { color: C.red, size: 17 });
+  result.reset = button(ctx, px + pw - 194, py + ph - 54, 160, 40, '전체 초기화', { color: C.red, size: 16 });
+  result.fps = button(ctx, px + pw / 2 - 90, py + ph - 54, 180, 40,
+    `FPS 표시: ${SETTINGS.showFps ? 'ON' : 'OFF'}`, { color: C.dim, size: 14 });
   return result;
+}
+
+// ── 초기화 확인 ────────────────────────────────────────────
+export function renderResetConfirm(ctx, save) {
+  dim(ctx, 0.9);
+  const pw = 620, ph = 300;
+  const px = (W - pw) / 2, py = (H - ph) / 2;
+  panel(ctx, px, py, pw, ph, C.red);
+
+  text(ctx, '정말 초기화할까요?', W / 2, py + 58, {
+    size: 28, align: 'center', color: C.red, glow: 14,
+  });
+
+  const owned = Object.values(save.upgrades).reduce((a, b) => a + b, 0);
+  const lines = [
+    `보유한 코드 조각 ${save.fragments}개가 사라집니다.`,
+    `구매한 영구 강화 ${owned}단계도 함께 사라집니다.`,
+    '최고 기록과 달성한 업적도 모두 지워집니다.',
+  ];
+  lines.forEach((l, i) => {
+    text(ctx, l, W / 2, py + 108 + i * 28, { size: 16, align: 'center', color: C.text });
+  });
+  text(ctx, '되돌릴 수 없습니다. 조각은 환불되지 않습니다.', W / 2, py + 206, {
+    size: 15, align: 'center', color: C.gold,
+  });
+
+  return {
+    cancel: button(ctx, px + 60, py + ph - 66, 200, 46, '취소', { size: 18 }),
+    confirm: button(ctx, px + pw - 260, py + ph - 66, 200, 46, '초기화', { color: C.red, size: 18 }),
+  };
+}
+
+// ── 업적 ──────────────────────────────────────────────────
+export function renderAchievements(ctx, save) {
+  dim(ctx, 0.88);
+  const pw = 820, ph = 500;
+  const px = (W - pw) / 2, py = (H - ph) / 2;
+  panel(ctx, px, py, pw, ph, C.gold);
+
+  const done = ACHIEVEMENTS.filter(a => save.achievements.includes(a.id)).length;
+  text(ctx, '업적', px + pw / 2, py + 42, { size: 28, align: 'center', color: C.gold, glow: 12 });
+  text(ctx, `${done} / ${ACHIEVEMENTS.length}`, px + pw / 2, py + 68, {
+    size: 15, align: 'center', color: C.dim,
+  });
+
+  // 2열 배치
+  const colW = (pw - 76) / 2;
+  const rowH = 52;
+  ACHIEVEMENTS.forEach((a, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = px + 38 + col * (colW + 4);
+    const y = py + 96 + row * rowH;
+    const got = save.achievements.includes(a.id);
+
+    ctx.save();
+    ctx.globalAlpha = got ? 1 : 0.4;
+    icon(ctx, got ? 'boot' : 'shield', x + 16, y + 14, 12, got ? C.gold : C.dim);
+    text(ctx, a.name, x + 38, y + 10, { size: 16, color: got ? C.text : C.dim });
+    text(ctx, a.desc, x + 38, y + 30, { size: 12, color: got ? C.dim : '#4a5578' });
+    ctx.restore();
+  });
+
+  return { back: button(ctx, px + pw / 2 - 90, py + ph - 56, 180, 42, '돌아가기', { size: 17 }) };
 }
 
 // ── 레벨업 카드 ────────────────────────────────────────────
@@ -256,9 +324,9 @@ export function renderPause(ctx, world) {
 }
 
 // ── 결과 ──────────────────────────────────────────────────
-export function renderResult(ctx, world, gained, isVictory) {
+export function renderResult(ctx, world, gained, isVictory, newAchievements = []) {
   dim(ctx, 0.85);
-  const pw = 620, ph = 420;
+  const pw = 620, ph = newAchievements.length ? 470 : 420;
   const px = (W - pw) / 2, py = (H - ph) / 2;
   panel(ctx, px, py, pw, ph, isVictory ? C.lime : C.red);
 
@@ -294,6 +362,19 @@ export function renderResult(ctx, world, gained, isVictory) {
     icon(ctx, def.icon, x, y, 13, def.color);
     levelDots(ctx, x, y + 22, world.player.passives[id], MAX_LEVEL, def.color);
     x += 40;
+  }
+
+  // 이번 판에 새로 달성한 업적
+  if (newAchievements.length) {
+    const ay = y + 46;
+    text(ctx, '업적 달성', px + 70, ay, { size: 14, color: C.gold });
+    newAchievements.slice(0, 3).forEach((a, i) => {
+      text(ctx, `· ${a.name}`, px + 70, ay + 22 + i * 20, { size: 15, color: C.text });
+    });
+    if (newAchievements.length > 3) {
+      text(ctx, `외 ${newAchievements.length - 3}개`, px + pw - 70, ay + 22,
+        { size: 13, align: 'right', color: C.dim });
+    }
   }
 
   return {

@@ -59,12 +59,14 @@ export const WEAPONS = {
     blurb: '주위를 돌며 닿는 적을 태운다',
     continuous: true,
     evolveWith: 'over', evolveTo: 'ionbelt',
+    // 회전이 느리면 이동 중에 "도는 것"으로 안 보이고 그냥 붙어다니는 점이 된다.
+    // 한 바퀴 2.6초는 너무 굼떠서 전체적으로 올렸다.
     levels: [
-      { dmg: 10, count: 1, radius: 70, spin: 2.4 },
-      { dmg: 13, count: 2, radius: 76, spin: 2.6 },
-      { dmg: 15, count: 3, radius: 84, spin: 2.8 },
-      { dmg: 18, count: 3, radius: 90, spin: 3.1 },
-      { dmg: 20, count: 4, radius: 95, spin: 3.4 },
+      { dmg: 10, count: 1, radius: 70, spin: 3.6 },
+      { dmg: 13, count: 2, radius: 76, spin: 3.9 },
+      { dmg: 15, count: 3, radius: 84, spin: 4.2 },
+      { dmg: 18, count: 3, radius: 90, spin: 4.6 },
+      { dmg: 20, count: 4, radius: 95, spin: 5.0 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.count}개`,
     sustain(world, w, L, dmg, dt) {
@@ -144,7 +146,7 @@ export const WEAPONS = {
     id: 'ionbelt', name: '전류 결계', color: '#fff2a8', icon: 'orbit', evolved: true,
     blurb: '노드를 잇는 전류가 몸을 감싼다',
     continuous: true,
-    levels: [{ dmg: 34, count: 5, radius: 110, spin: 4.2 }],
+    levels: [{ dmg: 34, count: 5, radius: 110, spin: 6.0 }],
     desc: L => `데미지 ${L.dmg} · ${L.count}개 · 연결 전류`,
     sustain(world, w, L, dmg, dt) {
       world.syncOrbitals(w.slot, L.count, L.radius, dmg, L.spin, dt, '#fff2a8', true);

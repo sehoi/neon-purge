@@ -81,6 +81,8 @@ export function createWorld(meta) {
 
     kills: 0,
     bonusFragments: 0,
+    // 업적 판정용 런 요약. endRun 에서 읽는다.
+    runStats: { hitsTaken: 0, revived: false },
     hpScale: 1,
     dmgScale: 1,
     eventLock: false,
@@ -138,6 +140,8 @@ export function startRun(world) {
   world.t = 0;
   world.kills = 0;
   world.bonusFragments = 0;
+  world.runStats.hitsTaken = 0;
+  world.runStats.revived = false;
   world.eventLock = false;
   world.boss = null;
   world.over = false;
@@ -268,7 +272,9 @@ const API = {
 
     let list = this.orbGroups.get(slot);
     if (!list) { list = []; this.orbGroups.set(slot, list); }
-    while (list.length < count) list.push({ x: 0, y: 0, r: 11, dmg: 0, slot, color, link });
+    while (list.length < count) {
+      list.push({ x: 0, y: 0, r: 11, dmg: 0, slot, color, link, angle: 0, radius: 0 });
+    }
     while (list.length > count) list.pop();
 
     const p = this.player;
@@ -280,6 +286,8 @@ const API = {
       o.dmg = dmg;
       o.color = color;
       o.link = link;
+      o.angle = a;         // 렌더가 회전 궤적을 그리는 데 쓴다
+      o.radius = radius;
     }
   },
 

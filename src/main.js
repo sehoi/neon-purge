@@ -15,8 +15,11 @@ import { renderWorld } from './render/renderer.js';
 import { renderHud } from './ui/hud.js';
 import {
   renderTitle, renderHelp, renderMeta, renderLevelUp, renderPause, renderResult,
+  renderResetConfirm, renderAchievements,
 } from './ui/screens.js';
 import { META, fragmentsEarned } from './data/meta.js';
+import { ACHIEVEMENTS, evaluateAchievements } from './data/achievements.js';
+import { WEAPONS } from './data/weapons.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -73,7 +76,8 @@ seed(Date.now() & 0x7fffffff);
 const world = createWorld(save.upgrades);
 
 const S = {
-  TITLE: 'title', HELP: 'help', META: 'meta',
+  TITLE: 'title', HELP: 'help', META: 'meta', RESET_CONFIRM: 'resetConfirm',
+  ACHIEVEMENTS: 'achievements',
   PLAYING: 'playing', PAUSED: 'paused', LEVELUP: 'levelup', RESULT: 'result',
 };
 let state = S.TITLE;
@@ -81,6 +85,7 @@ let choices = null;
 let levelAnim = 0;
 let resultGained = 0;
 let resultVictory = false;
+let newAchievements = [];
 let titleTime = 0;
 
 initInput(canvas, () => {
@@ -136,6 +141,23 @@ function endRun(victory) {
     save.best.cleared = true;
     save.best.clearTime = world.t;
   }
+
+  const p = world.player;
+  const ctxRun = {
+    victory,
+    time: world.t,
+    kills: world.kills,
+    level: p.level,
+    weapons: p.weapons.map(w => ({ id: w.id, lv: w.lv })),
+    passives: p.passives,
+    hitsTaken: world.runStats.hitsTaken,
+    revived: world.runStats.revived,
+    evolvedCount: p.weapons.filter(w => WEAPONS[w.id].evolved).length,
+  };
+  const unlocked = evaluateAchievements(ctxRun, save.achievements);
+  save.achievements.push(...unlocked);
+  newAchievements = unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id)).filter(Boolean);
+
   persist();
   stopMusic();
   state = S.RESULT;
@@ -232,6 +254,7 @@ function render() {
       if (r.start) { sfx('select'); beginRun(); }
       if (r.upgrade) { sfx('select'); state = S.META; }
       if (r.help) { sfx('select'); state = S.HELP; }
+      if (r.achievements) { sfx('select'); state = S.ACHIEVEMENTS; }
       if (r.fullscreen) {
         sfx('select');
         // 전체화면 요청은 사용자 제스처 안에서만 허용된다. 실패해도 게임은 계속 돈다.
@@ -244,6 +267,13 @@ function render() {
     case S.HELP: {
       renderWorld(ctx, world);
       const r = renderHelp(ctx);
+      if (r.back) { sfx('select'); state = S.TITLE; }
+      break;
+    }
+
+    case S.ACHIEVEMENTS: {
+      renderWorld(ctx, world);
+      const r = renderAchievements(ctx, save);
       if (r.back) { sfx('select'); state = S.TITLE; }
       break;
     }
@@ -262,14 +292,26 @@ function render() {
           sfx('levelup');
         }
       }
-      if (r.reset) {
+      // 초기화는 되돌릴 수 없고 조각도 환불되지 않는다 — 반드시 한 번 더 묻는다
+      if (r.reset) { sfx('select'); state = S.RESET_CONFIRM; }
+      if (r.fps) { SETTINGS.showFps = !SETTINGS.showFps; persist(); }
+      if (r.back) { sfx('select'); state = S.TITLE; }
+      break;
+    }
+
+    case S.RESET_CONFIRM: {
+      renderWorld(ctx, world);
+      const r = renderResetConfirm(ctx, save);
+      if (r.cancel) { sfx('select'); state = S.META; }
+      if (r.confirm) {
         const fresh = resetSave();
         save.fragments = fresh.fragments;
         Object.assign(save.upgrades, fresh.upgrades);
         Object.assign(save.best, fresh.best);
+        save.achievements.length = 0;
         sfx('hurt');
+        state = S.META;
       }
-      if (r.back) { sfx('select'); state = S.TITLE; }
       break;
     }
 
@@ -306,14 +348,44 @@ function render() {
 
     case S.RESULT: {
       renderWorld(ctx, world);
-      const r = renderResult(ctx, world, resultGained, resultVictory);
+      const r = renderResult(ctx, world, resultGained, resultVictory, newAchievements);
       if (r.retry) { sfx('select'); beginRun(); }
       if (r.title) { sfx('select'); state = S.TITLE; }
       break;
     }
   }
 
+  if (SETTINGS.showFps) renderFps();
   if (DEBUG_INPUT) renderInputDebug();
+}
+
+// ── FPS 측정 ────────────────────────────────────────────────
+// 순간값은 널뛰어서 읽기 어렵다. 최근 프레임의 지수 이동 평균을 쓰고,
+// 그 판에서 가장 나빴던 프레임(worst)을 함께 보여준다 — 버벅임은 평균이 아니라 스파이크다.
+const fps = { avgMs: 16.7, worstMs: 0, worstResetAt: 0 };
+
+function trackFps(dtMs, nowMs) {
+  fps.avgMs += (dtMs - fps.avgMs) * 0.08;
+  if (dtMs > fps.worstMs) fps.worstMs = dtMs;
+  if (nowMs - fps.worstResetAt > 3000) {   // 3초마다 최악값을 잊는다
+    fps.worstMs = dtMs;
+    fps.worstResetAt = nowMs;
+  }
+}
+
+function renderFps() {
+  const f = 1000 / Math.max(0.1, fps.avgMs);
+  const worst = Math.round(1000 / Math.max(0.1, fps.worstMs));
+  const color = f >= 55 ? C.lime : f >= 40 ? C.gold : C.red;
+  ctx.save();
+  ctx.font = '14px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(4,6,16,0.6)';
+  ctx.fillRect(cfg.W - 116, cfg.H - 28, 108, 20);
+  ctx.fillStyle = color;
+  ctx.fillText(`${Math.round(f)} fps (${worst})`, cfg.W - 14, cfg.H - 25);
+  ctx.restore();
 }
 
 // ── 루프 ────────────────────────────────────────────────────
@@ -321,8 +393,10 @@ let acc = 0;
 let prev = performance.now();
 
 function frame(now) {
-  let dt = Math.min((now - prev) / 1000, MAX_FRAME);
+  const rawMs = now - prev;
+  let dt = Math.min(rawMs / 1000, MAX_FRAME);
   prev = now;
+  trackFps(rawMs, now);
 
   // 세로로 들고 있으면 게임을 진행하지 않는다 (render 가 안내 화면을 그린다)
   if (isPortrait()) {

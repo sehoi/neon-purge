@@ -295,6 +295,18 @@ function drawPlayerAttacks(ctx, world, visible) {
   world.forEachOrbital(o => _orbs.push(o));
   if (_orbs.length) {
     const col = _orbs[0].color;
+
+    // 회전 궤적. 이게 없으면 이동 중에는 그냥 붙어다니는 점으로 보인다.
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    for (const o of _orbs) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, o.radius, o.angle - 0.85, o.angle);
+      ctx.stroke();
+    }
+    ctx.restore();
     if (SETTINGS.glow) {
       ctx.globalAlpha = 0.2;
       ctx.fillStyle = col;

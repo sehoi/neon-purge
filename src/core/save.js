@@ -10,7 +10,8 @@ const DEFAULT = {
   fragments: 0,
   upgrades: { core: 0, memory: 0, fan: 0, prefetch: 0, backup: 0 },
   best: { time: 0, kills: 0, cleared: false, clearTime: 0 },
-  settings: { glow: true, muted: false, shake: 1.0 },
+  achievements: [],   // 달성한 업적 id
+  settings: { glow: true, muted: false, shake: 1.0, showFps: false },
 };
 
 let data = clone(DEFAULT);
@@ -29,6 +30,7 @@ export function loadSave() {
         data.upgrades = Object.assign(clone(DEFAULT.upgrades), parsed.upgrades);
         data.best = Object.assign(clone(DEFAULT.best), parsed.best);
         data.settings = Object.assign(clone(DEFAULT.settings), parsed.settings);
+        data.achievements = Array.isArray(parsed.achievements) ? parsed.achievements.slice() : [];
       }
     }
   } catch {
@@ -37,6 +39,7 @@ export function loadSave() {
   SETTINGS.glow = data.settings.glow;
   SETTINGS.muted = data.settings.muted;
   SETTINGS.shake = data.settings.shake;
+  SETTINGS.showFps = data.settings.showFps;
   return data;
 }
 
@@ -47,6 +50,7 @@ export function persist() {
     data.settings.glow = SETTINGS.glow;
     data.settings.muted = SETTINGS.muted;
     data.settings.shake = SETTINGS.shake;
+    data.settings.showFps = SETTINGS.showFps;
     localStorage.setItem(KEY, JSON.stringify(data));
   } catch {
     // 시크릿 모드 등에서 실패할 수 있다. 게임 진행에는 영향 없음.

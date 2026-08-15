@@ -91,6 +91,7 @@ export function updatePlayer(p, world, dt) {
 export function damagePlayer(p, world, amount) {
   if (p.iframe > 0 || !p.alive) return;
   p.hp -= amount;
+  world.runStats.hitsTaken++;
   p.iframe = PLAYER_BASE.ihit;
   world.sfx('hurt');
   addShake(9);
@@ -100,6 +101,7 @@ export function damagePlayer(p, world, amount) {
   if (p.hp <= 0) {
     if (p.revives > 0) {
       p.revives--;
+      world.runStats.revived = true;
       p.hp = p.stats.maxHp * 0.5;
       p.iframe = 2.0;
       world.sfx('heal');
