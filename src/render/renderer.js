@@ -1,6 +1,6 @@
 // 월드 렌더링. 드로우 순서와 글로우 비용을 여기서 통제한다.
 
-import { W, H, C, SETTINGS } from '../config.js';
+import { W, H, C, SETTINGS, IS_TOUCH } from '../config.js';
 import { camera, camOffsetX, camOffsetY } from '../game/camera.js';
 import { particles } from '../game/particle.js';
 import { polygon, fillPolygon, star, circle, disc, line, ship, zap } from './shapes.js';
@@ -38,8 +38,11 @@ function neon(ctx, color, width, drawPath) {
  */
 let _lowDetail = false;
 
+// 모바일 GPU 는 훨씬 일찍 무릎을 꿇으므로 임계값을 낮게 잡는다.
+const DETAIL_THRESHOLD = IS_TOUCH ? 120 : 260;
+
 function updateDetailLevel(world) {
-  _lowDetail = world.enemies.count + particles.count > 260;
+  _lowDetail = world.enemies.count + particles.count > DETAIL_THRESHOLD;
 }
 
 /** 축소 대상에서 제외되는 요소용 — 플레이어, 보스, 빔처럼 수가 적고 중요한 것들. */

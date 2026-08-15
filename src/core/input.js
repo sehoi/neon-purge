@@ -1,6 +1,6 @@
 // 키보드 + 터치를 하나의 정규화된 입력으로 합친다.
 
-import { W, H } from '../config.js';
+import { W, TOUCH_UI } from '../config.js';
 
 const keys = new Set();
 
@@ -10,9 +10,15 @@ export const input = {
   pointer: { x: 0, y: 0, down: false, justPressed: false },
   anyKey: false,
   pressed: new Set(),    // 이번 프레임에 새로 눌린 키 코드
+
+  // main 이 매 프레임 갱신한다. 전투 중이 아니면 터치는 전부 UI 입력으로 취급한다.
+  // (레벨업 카드를 고르려고 우측을 탭했는데 대시가 예약되는 일을 막는다)
+  gameplay: false,
+  pauseTapped: false,    // 모바일 일시정지 버튼
 };
 
 let touchStick = null;   // { id, ox, oy, x, y }
+let dashTouchId = null;
 let dashQueued = false;
 let canvas = null;
 let onBlur = null;
@@ -21,6 +27,11 @@ const LEFT  = ['KeyA', 'ArrowLeft'];
 const RIGHT = ['KeyD', 'ArrowRight'];
 const UP    = ['KeyW', 'ArrowUp'];
 const DOWN  = ['KeyS', 'ArrowDown'];
+
+function inCircle(p, cx, cy, r) {
+  const dx = p.x - cx, dy = p.y - cy;
+  return dx * dx + dy * dy <= r * r;
+}
 
 export function initInput(cv, blurHandler) {
   canvas = cv;
@@ -44,39 +55,56 @@ export function initInput(cv, blurHandler) {
   addEventListener('blur', () => {
     keys.clear();
     touchStick = null;
+    dashTouchId = null;
     if (onBlur) onBlur();
   });
 
   cv.addEventListener('pointerdown', e => {
-    cv.setPointerCapture(e.pointerId);
     const p = toCanvas(e);
+
+    if (e.pointerType === 'touch' && input.gameplay) {
+      // 전투 중 터치는 조작기다. 스틱 손가락이 UI 포인터를 끌고 다니면 안 되므로
+      // pointer 는 갱신하지 않는다.
+      if (inCircle(p, TOUCH_UI.pauseX, TOUCH_UI.pauseY, TOUCH_UI.pauseR + 10)) {
+        input.pauseTapped = true;
+        return;
+      }
+      if (inCircle(p, TOUCH_UI.dashX, TOUCH_UI.dashY, TOUCH_UI.dashR)) {
+        dashTouchId = e.pointerId;
+        dashQueued = true;
+        return;
+      }
+      if (p.x < W * 0.62 && !touchStick) {
+        cv.setPointerCapture(e.pointerId);
+        touchStick = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
+        return;
+      }
+      return;   // 우측 빈 공간 탭은 무시 (예전에는 여기서도 대시가 걸렸다)
+    }
+
+    // 그 외에는 전부 UI 포인터
     input.pointer.x = p.x;
     input.pointer.y = p.y;
     input.pointer.down = true;
     input.pointer.justPressed = true;
-
-    if (e.pointerType === 'touch') {
-      if (p.x < W * 0.5) {
-        touchStick = { id: e.pointerId, ox: p.x, oy: p.y, x: p.x, y: p.y };
-      } else {
-        dashQueued = true;
-      }
-    }
   });
 
   cv.addEventListener('pointermove', e => {
     const p = toCanvas(e);
-    input.pointer.x = p.x;
-    input.pointer.y = p.y;
     if (touchStick && touchStick.id === e.pointerId) {
       touchStick.x = p.x;
       touchStick.y = p.y;
+      return;                       // 스틱 손가락은 UI 포인터를 움직이지 않는다
     }
+    if (e.pointerType === 'touch' && input.gameplay) return;
+    input.pointer.x = p.x;
+    input.pointer.y = p.y;
   });
 
   const release = e => {
+    if (touchStick && touchStick.id === e.pointerId) { touchStick = null; return; }
+    if (dashTouchId === e.pointerId) { dashTouchId = null; return; }
     input.pointer.down = false;
-    if (touchStick && touchStick.id === e.pointerId) touchStick = null;
   };
   cv.addEventListener('pointerup', release);
   cv.addEventListener('pointercancel', release);
@@ -128,6 +156,7 @@ export function pollInput() {
 /** 매 프레임 update 뒤에서 호출. 엣지 트리거들을 소비한다. */
 export function endFrameInput() {
   input.pointer.justPressed = false;
+  input.pauseTapped = false;
   input.pressed.clear();
   input.anyKey = false;
 }
@@ -138,4 +167,15 @@ export function keyPressed(code) {
 
 export function getTouchStick() {
   return touchStick;
+}
+
+export function isDashHeld() {
+  return dashTouchId !== null;
+}
+
+/** 상태가 바뀔 때 조작 중이던 터치를 정리한다. */
+export function clearTouchState() {
+  touchStick = null;
+  dashTouchId = null;
+  dashQueued = false;
 }

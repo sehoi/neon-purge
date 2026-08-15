@@ -2,6 +2,12 @@
 
 import { entryAt, TIMELINE } from '../data/waves.js';
 import { rnd, range } from '../core/rng.js';
+import { IS_TOUCH, MOBILE_CAP_SCALE } from '../config.js';
+
+/** 모바일에서는 동시 적 수를 줄인다. 곡선의 모양은 그대로 두고 높이만 낮춘다. */
+function capFor(entry) {
+  return IS_TOUCH ? Math.round(entry.cap * MOBILE_CAP_SCALE) : entry.cap;
+}
 
 const SPAWN_MIN = 700;
 const SPAWN_MAX = 820;
@@ -39,14 +45,15 @@ export function updateSpawner(sp, world, dt) {
 
   const entry = entryAt(world.t);
   if (!entry.spawn) return;
-  if (world.enemies.count >= entry.cap) return;
+  const cap = capFor(entry);
+  if (world.enemies.count >= cap) return;
 
   for (const type in entry.spawn) {
     const rate = entry.spawn[type];
     sp.acc[type] = (sp.acc[type] || 0) + rate * dt;
     while (sp.acc[type] >= 1) {
       sp.acc[type] -= 1;
-      if (world.enemies.count >= entry.cap) break;
+      if (world.enemies.count >= cap) break;
 
       if (entry.frenzy && rnd() < 0.25) {
         // 광란 페이즈: 사방에서 동시에 밀려온다

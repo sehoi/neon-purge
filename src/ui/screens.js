@@ -1,6 +1,6 @@
 // 타이틀 / 레벨업 / 일시정지 / 결과 / 영구 업그레이드 화면.
 
-import { W, H, C, SETTINGS } from '../config.js';
+import { W, H, C, SETTINGS, IS_TOUCH } from '../config.js';
 import { text, panel, button, icon, formatTime, levelDots } from './widgets.js';
 import { input, keyPressed } from '../core/input.js';
 import { META, META_IDS } from '../data/meta.js';
@@ -31,6 +31,11 @@ export function renderTitle(ctx, save) {
     upgrade: button(ctx, bx, 366, bw, bh, `업그레이드  (${save.fragments})`, { color: C.gold, size: 19 }),
     help:    button(ctx, bx, 432, bw, bh, '조작법', { color: C.dim, size: 19 }),
   };
+  // 모바일은 주소창이 화면을 갉아먹는다. 전체화면으로 들어갈 수단을 준다.
+  if (IS_TOUCH && document.fullscreenEnabled) {
+    r.fullscreen = button(ctx, bx, 498, bw, 44,
+      document.fullscreenElement ? '전체화면 해제' : '전체화면', { color: C.dim, size: 17 });
+  }
 
   if (save.best.kills > 0) {
     const b = save.best;
@@ -39,7 +44,8 @@ export function renderTitle(ctx, save) {
       : `최고 기록: ${formatTime(b.time)} 생존 · ${b.kills} 처치`;
     text(ctx, line, W / 2, H - 56, { size: 14, align: 'center', color: C.dim });
   }
-  text(ctx, 'WASD 이동 · Space 대시 · 공격은 자동', W / 2, H - 30, {
+  text(ctx, IS_TOUCH ? '왼쪽 드래그로 이동 · 오른쪽 아래 대시 · 공격은 자동'
+                     : 'WASD 이동 · Space 대시 · 공격은 자동', W / 2, H - 30, {
     size: 13, align: 'center', color: '#4a5578',
   });
 
@@ -55,9 +61,15 @@ export function renderHelp(ctx) {
 
   text(ctx, '조작법', px + pw / 2, py + 46, { size: 30, align: 'center', color: C.cyan, glow: 12 });
 
-  const lines = [
+  const lines = IS_TOUCH ? [
+    ['화면 왼쪽', '누른 자리가 조이스틱 중심이 된다'],
+    ['오른쪽 아래 원', '대시 — 짧은 무적. 쿨다운 1.8초'],
+    ['카드 탭', '강화 선택'],
+    ['오른쪽 위 ▮▮', '일시정지'],
+    ['가로 모드', '세로로 들면 화면이 너무 좁다'],
+  ] : [
     ['WASD / 방향키', '이동'],
-    ['Space', '대시 — 짧은 무적. 쿨다운 2초'],
+    ['Space', '대시 — 짧은 무적. 쿨다운 1.8초'],
     ['1 2 3 / 클릭', '강화 카드 선택'],
     ['Esc / P', '일시정지'],
     ['M', '음소거'],

@@ -1,7 +1,7 @@
 // 엔트리: 캔버스 셋업, 고정 타임스텝 루프, 상태 머신.
 
-import { W, H, STEP, MAX_FRAME, SETTINGS, RUN_LENGTH } from './config.js';
-import { initInput, pollInput, endFrameInput, input, keyPressed } from './core/input.js';
+import { W, H, STEP, MAX_FRAME, SETTINGS, RUN_LENGTH, IS_TOUCH, MAX_DPR, C } from './config.js';
+import { initInput, pollInput, endFrameInput, input, keyPressed, clearTouchState } from './core/input.js';
 import { initAudio, resumeAudio, setMuted, sfx, startMusic, stopMusic, updateMusic, setMusicIntensity } from './core/audio.js';
 import { loadSave, persist, resetSave } from './core/save.js';
 import { seed } from './core/rng.js';
@@ -21,7 +21,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { alpha: false });
 
 function fitCanvas() {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  // 모바일 GPU 는 픽셀 수에 민감하다. DPR 을 1.5 로 묶어 렌더 면적을 절반 가까이 줄인다.
+  const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -30,6 +31,34 @@ function fitCanvas() {
 }
 fitCanvas();
 addEventListener('resize', fitCanvas);
+addEventListener('orientationchange', fitCanvas);
+
+/** 세로로 들면 16:9 화면이 손톱만해진다. 가로를 요구한다. */
+function isPortrait() {
+  return IS_TOUCH && window.innerHeight > window.innerWidth;
+}
+
+function renderRotateNotice() {
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(W / 2, H / 2);
+  ctx.strokeStyle = C.cyan;
+  ctx.lineWidth = 4;
+  ctx.shadowColor = C.cyan;
+  ctx.shadowBlur = 20;
+  // 눕힌 단말기 모양
+  ctx.strokeRect(-90, -55, 180, 110);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 130, Math.PI * 0.15, Math.PI * 0.85);
+  ctx.stroke();
+  ctx.restore();
+  ctx.font = '26px ui-monospace, monospace';
+  ctx.fillStyle = C.text;
+  ctx.textAlign = 'center';
+  ctx.fillText('기기를 가로로 돌려주세요', W / 2, H / 2 + 190);
+}
 
 const save = loadSave();
 setMuted(SETTINGS.muted);
@@ -97,7 +126,11 @@ function update(dt) {
       break;
 
     case S.PLAYING: {
-      if (keyPressed('Escape') || keyPressed('KeyP')) { state = S.PAUSED; return; }
+      if (keyPressed('Escape') || keyPressed('KeyP') || input.pauseTapped) {
+        state = S.PAUSED;
+        clearTouchState();
+        return;
+      }
       updateWorld(world, dt);
       setMusicIntensity(world.t / RUN_LENGTH);
       updateMusic(dt);
@@ -109,6 +142,7 @@ function update(dt) {
         choices = buildChoices(world.player);
         levelAnim = 0;
         state = S.LEVELUP;
+        clearTouchState();   // 스틱을 잡은 채 레벨업하면 손가락이 카드로 안 넘어간다
         sfx('levelup');
       }
       break;
@@ -130,6 +164,8 @@ function update(dt) {
 
 // ── 렌더 ────────────────────────────────────────────────────
 function render() {
+  if (isPortrait()) { renderRotateNotice(); return; }
+
   switch (state) {
     case S.TITLE: {
       renderWorld(ctx, world);
@@ -137,6 +173,12 @@ function render() {
       if (r.start) { sfx('select'); beginRun(); }
       if (r.upgrade) { sfx('select'); state = S.META; }
       if (r.help) { sfx('select'); state = S.HELP; }
+      if (r.fullscreen) {
+        sfx('select');
+        // 전체화면 요청은 사용자 제스처 안에서만 허용된다. 실패해도 게임은 계속 돈다.
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
+      }
       break;
     }
 
@@ -221,6 +263,16 @@ function frame(now) {
   let dt = Math.min((now - prev) / 1000, MAX_FRAME);
   prev = now;
 
+  // 세로로 들고 있으면 게임을 진행하지 않는다 (render 가 안내 화면을 그린다)
+  if (isPortrait()) {
+    if (state === S.PLAYING) { state = S.PAUSED; clearTouchState(); }
+    render();
+    endFrameInput();
+    requestAnimationFrame(frame);
+    return;
+  }
+
+  input.gameplay = state === S.PLAYING;
   pollInput();
 
   // 히트스톱: 시간만 멈추고 렌더는 계속 (타격감의 핵심)
@@ -273,4 +325,6 @@ window.NP = {
   levelUp(n = 1) { world.pendingLevelUps += n; },
   godMode() { world.player.stats.maxHp = 1e9; world.player.hp = 1e9; },
   setState(s) { state = s; },
+  poll: pollInput,
+  endFrame: endFrameInput,
 };
