@@ -115,12 +115,12 @@ export function buildChoices(p, count = 3) {
   // 뽑을 게 남지 않았을 때의 보험
   if (pool.length === 0) {
     return [
-      { kind: 'heal', weight: 1, name: '무결성 복구', color: C.mint, icon: 'shield',
-        line1: '소모품', line2: '체력을 전부 회복한다' },
+      { kind: 'heal', weight: 1, name: '긴급 복구', color: C.mint, icon: 'shield',
+        line1: '즉시 발동', line2: '체력을 전부 회복한다' },
       { kind: 'frag', weight: 1, name: '코드 조각', color: C.gold, icon: 'amp',
-        line1: '소모품', line2: '코드 조각 +100' },
-      { kind: 'nuke', weight: 1, name: '긴급 퍼지', color: C.red, icon: 'ring',
-        line1: '소모품', line2: '화면 내 전체에 큰 피해' },
+        line1: '즉시 발동', line2: '영구 강화에 쓸 조각 +100' },
+      { kind: 'nuke', weight: 1, name: '전역 퍼지', color: C.red, icon: 'ring',
+        line1: '즉시 발동', line2: '화면 안의 모든 적에게 큰 피해' },
     ];
   }
 
@@ -135,8 +135,8 @@ export function buildChoices(p, count = 3) {
 
   // 후보가 3개 미만이면 소모품으로 채운다
   while (picked.length < count) {
-    picked.push({ kind: 'heal', name: '무결성 복구', color: C.mint, icon: 'shield',
-      line1: '소모품', line2: '체력을 전부 회복한다' });
+    picked.push({ kind: 'heal', name: '긴급 복구', color: C.mint, icon: 'shield',
+      line1: '즉시 발동', line2: '체력을 전부 회복한다' });
   }
   return picked;
 }

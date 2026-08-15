@@ -6,8 +6,8 @@ import { C } from '../config.js';
 
 export const WEAPONS = {
   pulse: {
-    id: 'pulse', name: '펄스 링', color: C.cyan, icon: 'ring',
-    blurb: '주위로 퍼지는 충격파',
+    id: 'pulse', name: '충격 파동', color: C.cyan, icon: 'ring',
+    blurb: '사방으로 퍼지는 파동. 붙은 적을 쓸어낸다',
     evolveWith: 'amp', evolveTo: 'supernova',
     // 시작 무기. Lv1 DPS 가 웜을 2방에 잡을 만큼은 되어야 초반이 성립한다.
     levels: [
@@ -25,8 +25,8 @@ export const WEAPONS = {
   },
 
   tracer: {
-    id: 'tracer', name: '트레이서', color: '#7dff9e', icon: 'bolt',
-    blurb: '가장 가까운 적을 자동 조준',
+    id: 'tracer', name: '추적탄', color: '#7dff9e', icon: 'bolt',
+    blurb: '가장 가까운 적을 자동으로 조준한다',
     evolveWith: 'clock', evolveTo: 'railgun',
     levels: [
       { dmg: 12, count: 1, cd: 0.80, spd: 460 },
@@ -55,8 +55,8 @@ export const WEAPONS = {
   },
 
   orbit: {
-    id: 'orbit', name: '오빗 노드', color: C.gold, icon: 'orbit',
-    blurb: '주위를 도는 궤도 오브',
+    id: 'orbit', name: '궤도 노드', color: C.gold, icon: 'orbit',
+    blurb: '주위를 돌며 닿는 적을 태운다',
     continuous: true,
     evolveWith: 'over', evolveTo: 'ionbelt',
     levels: [
@@ -73,8 +73,8 @@ export const WEAPONS = {
   },
 
   chain: {
-    id: 'chain', name: '체인 아크', color: '#6bc8ff', icon: 'chain',
-    blurb: '적 사이를 튀는 번개',
+    id: 'chain', name: '연쇄 방전', color: '#6bc8ff', icon: 'chain',
+    blurb: '적에서 적으로 튀는 번개. 뭉칠수록 강하다',
     levels: [
       { dmg: 14, bounces: 2, cd: 1.60 },
       { dmg: 17, bounces: 3, cd: 1.45 },
@@ -89,8 +89,8 @@ export const WEAPONS = {
   },
 
   laser: {
-    id: 'laser', name: '레이저 스윕', color: C.red, icon: 'laser',
-    blurb: '화면을 가로지르는 회전 빔',
+    id: 'laser', name: '관통 빔', color: C.red, icon: 'laser',
+    blurb: '화면을 가로지르며 천천히 회전한다',
     levels: [
       { dmg: 20, beams: 1, cd: 3.0, spin: 0.9, life: 1.6 },
       { dmg: 24, beams: 1, cd: 2.7, spin: 1.0, life: 1.8 },
@@ -110,8 +110,8 @@ export const WEAPONS = {
 
   // ── 진화형 ────────────────────────────────────────────────
   supernova: {
-    id: 'supernova', name: '슈퍼노바', color: '#ffffff', icon: 'ring', evolved: true,
-    blurb: '거대 충격파 + 넉백',
+    id: 'supernova', name: '초신성', color: '#ffffff', icon: 'ring', evolved: true,
+    blurb: '화면을 삼키는 파동. 적을 멀리 밀어낸다',
     levels: [{ dmg: 40, radius: 320, cd: 1.1 }],
     desc: L => `데미지 ${L.dmg} · 반경 ${L.radius} · 넉백`,
     fire(world, w, L, dmg) {
@@ -123,7 +123,7 @@ export const WEAPONS = {
 
   railgun: {
     id: 'railgun', name: '레일건', color: '#c8ffd8', icon: 'bolt', evolved: true,
-    blurb: '관통하는 초고속 탄',
+    blurb: '한 줄에 선 적을 전부 꿰뚫는다',
     levels: [{ dmg: 66, count: 3, cd: 0.5, spd: 900 }],
     desc: L => `데미지 ${L.dmg} · 관통 · ${L.count}발`,
     fire(world, w, L, dmg) {
@@ -141,8 +141,8 @@ export const WEAPONS = {
   },
 
   ionbelt: {
-    id: 'ionbelt', name: '이온 벨트', color: '#fff2a8', icon: 'orbit', evolved: true,
-    blurb: '오브 사이를 전류가 연결',
+    id: 'ionbelt', name: '전류 결계', color: '#fff2a8', icon: 'orbit', evolved: true,
+    blurb: '노드를 잇는 전류가 몸을 감싼다',
     continuous: true,
     levels: [{ dmg: 34, count: 5, radius: 110, spin: 4.2 }],
     desc: L => `데미지 ${L.dmg} · ${L.count}개 · 연결 전류`,
