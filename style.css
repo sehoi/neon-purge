@@ -18,6 +18,15 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+
+  /* 가로 모드 노치는 좌우에 온다. 안전 영역을 비켜야 화면 가장자리의 HUD
+     (특히 상단 경험치 바)가 잘리지 않는다. */
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
 }
 
 /* 논리 해상도 1280x720 을 유지한 채 레터박스 스케일 */

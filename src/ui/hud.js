@@ -14,11 +14,17 @@ import { TAU } from '../core/vec.js';
 export function renderHud(ctx, world) {
   const p = world.player;
 
-  // 상단 경험치 바 (화면 폭 전체, 얇게)
-  bar(ctx, 0, 0, W, 6, p.xp / p.xpNext, C.lime, '#101528');
+  // 경험치 바.
+  // 터치에서는 화면 맨 끝에 6px 로 붙여두면 축소 스케일과 둥근 모서리에 묻혀 보이지 않는다.
+  // 두껍게, 가장자리에서 띄워서 그린다.
+  if (IS_TOUCH) {
+    bar(ctx, 14, 8, W - 28, 10, p.xp / p.xpNext, C.lime, '#101528');
+  } else {
+    bar(ctx, 0, 0, W, 6, p.xp / p.xpNext, C.lime, '#101528');
+  }
 
   // 타이머
-  text(ctx, formatTime(world.t), W / 2, 34, {
+  text(ctx, formatTime(world.t), W / 2, IS_TOUCH ? 42 : 34, {
     size: 30, align: 'center', color: C.text, glow: 10,
   });
 
@@ -76,25 +82,25 @@ function renderDesktopHud(ctx, world) {
 function renderTouchHud(ctx, world) {
   const p = world.player;
 
-  // 좌상단: 체력바 + 레벨 + 처치
+  // 좌상단: 체력바 + 레벨 + 처치 (경험치 바 아래)
   const hpW = 240;
-  bar(ctx, 16, 18, hpW, 18, p.hp / p.stats.maxHp, C.cyan, '#141a30');
-  text(ctx, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`, 16 + hpW / 2, 27, {
+  bar(ctx, 16, 26, hpW, 18, p.hp / p.stats.maxHp, C.cyan, '#141a30');
+  text(ctx, `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`, 16 + hpW / 2, 35, {
     size: 13, align: 'center', baseline: 'middle', color: '#04121a',
   });
-  text(ctx, `LV ${p.level}`, 16, 56, { size: 17, color: C.lime, glow: 6 });
-  text(ctx, `처치 ${world.kills}`, 90, 56, { size: 14, color: C.dim });
+  text(ctx, `LV ${p.level}`, 16, 64, { size: 17, color: C.lime, glow: 6 });
+  text(ctx, `처치 ${world.kills}`, 90, 64, { size: 14, color: C.dim });
   if (p.revives > 0) {
-    text(ctx, `백업 ×${p.revives}`, 170, 56, { size: 13, color: C.gold });
+    text(ctx, `백업 ×${p.revives}`, 170, 64, { size: 13, color: C.gold });
   }
 
   // 우상단: 로드아웃 2줄
-  drawLoadout(ctx, p, W - 16, 34, 78);
+  drawLoadout(ctx, p, W - 16, 42, 86);
 
   // 남은 시간은 타이머 아래에 작게
   const remain = Math.max(0, RUN_LENGTH - world.t);
   if (!world.boss) {
-    text(ctx, `정화까지 ${formatTime(remain)}`, W / 2, 56, {
+    text(ctx, `정화까지 ${formatTime(remain)}`, W / 2, 64, {
       size: 13, align: 'center', color: C.dim,
     });
   }

@@ -15,7 +15,7 @@ export const STEP = 1 / 60;
 export const MAX_FRAME = 0.25;
 
 const MIN_W = 1280;   // 16:9
-const MAX_W = 1900;   // 그 이상 넓히면 적이 화면 밖에서 너무 오래 접근한다
+const MAX_W = 1750;   // 그 이상 넓히면 렌더 면적도 커지고 적이 화면 밖에 너무 오래 머문다
 
 /** @returns {boolean} 폭이 실제로 바뀌었는가 */
 export function setViewport(cssW, cssH) {
@@ -42,13 +42,25 @@ export const C = {
   dim:     '#7b88a8',
 };
 
+/**
+ * 손가락으로 조작하는 기기인가.
+ * 마우스가 달린 터치스크린 노트북까지 모바일 UI 로 바꾸면 오히려 불편하므로,
+ * "정밀한 포인터가 없는" 기기만 잡는다.
+ */
+export const IS_TOUCH =
+  typeof matchMedia === 'function' &&
+  matchMedia('(pointer: coarse)').matches &&
+  (navigator.maxTouchPoints || 0) > 0;
+
 export const PLAYER_BASE = {
   maxHp:     100,
-  speed:     245,   // 속도감 우선. 적 속도도 함께 올려 추격감은 유지한다
+  // 터치에서는 화면이 가로로 넓어진 만큼(1280 → 1480 안팎) 같은 속도가 더 굼떠 보인다.
+  // 화면 폭이 늘어난 비율만큼 올려 체감 속도를 맞춘다.
+  speed:     IS_TOUCH ? 285 : 245,
   radius:    10,
   ihit:      0.7,   // 피격 무적 시간
-  magnet:    105,   // 캐시 패시브 없이도 줍는 맛이 나야 한다
-  dashDist:  155,
+  magnet:    105,   // 데이터 흡인 없이도 줍는 맛이 나야 한다
+  dashDist:  IS_TOUCH ? 175 : 155,
   dashCd:    1.8,
   dashTime:  0.14,  // 대시 지속
   dashIframe: 0.25,
@@ -65,16 +77,6 @@ export const SETTINGS = {
   muted: false,
 };
 
-/**
- * 손가락으로 조작하는 기기인가.
- * 마우스가 달린 터치스크린 노트북까지 모바일 UI 로 바꾸면 오히려 불편하므로,
- * "정밀한 포인터가 없는" 기기만 잡는다.
- */
-export const IS_TOUCH =
-  typeof matchMedia === 'function' &&
-  matchMedia('(pointer: coarse)').matches &&
-  (navigator.maxTouchPoints || 0) > 0;
-
 /** 터치 조작 UI 배치. W 가 바뀌면 refreshTouchUI 로 다시 계산한다. */
 export const TOUCH_UI = {
   dashX: 0, dashY: 0, dashR: 58,
@@ -86,10 +88,11 @@ export function refreshTouchUI() {
   TOUCH_UI.dashY = H - 100;
   // 일시정지는 상단 중앙(타이머 옆). 손은 화면 아래쪽에 있으므로 여기가 안 가려진다.
   TOUCH_UI.pauseX = W / 2 + 108;
-  TOUCH_UI.pauseY = 40;
+  TOUCH_UI.pauseY = 48;
 }
 refreshTouchUI();
 
 // 모바일 GPU 는 데스크톱보다 한참 느리다. 동시 적 수를 줄이고 픽셀도 덜 그린다.
 export const MOBILE_CAP_SCALE = 0.6;
-export const MAX_DPR = IS_TOUCH ? 1.5 : 2;
+// 논리 폭이 1480 안팎이면 DPR 1.5 에서 캔버스가 2220×1080 이 된다. 모바일에는 과하다.
+export const MAX_DPR = IS_TOUCH ? 1.25 : 2;

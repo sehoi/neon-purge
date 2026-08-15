@@ -102,20 +102,30 @@ export function renderWorld(ctx, world) {
   drawVignette(ctx, world);
 }
 
+// 터치에서는 격자를 성기게 — 화면이 가로로 넓어 세로선이 그만큼 늘어나고,
+// 그 선들이 수평 이동 중 계속 다시 그려진다.
+const GRID_SIZE = IS_TOUCH ? 116 : 80;
+
+/**
+ * 배경 그리드.
+ *
+ * 반복 패턴(createPattern + fillRect)으로 바꿔봤다가 되돌렸다 — DPR 변환이 걸린
+ * 상태에서는 타일을 리샘플링하느라 오히려 3배 이상 느렸다(9.5ms → 31.9ms).
+ * 선을 직접 긋는 쪽이 훨씬 싸다. 화면 밖으로 나가는 선은 그리지 않는다.
+ */
 function drawGrid(ctx, ox, oy) {
-  const size = 80;
   // 패럴랙스 0.4 — 배경이 플레이어보다 천천히 흐른다
-  const px = (ox * 0.4) % size;
-  const py = (oy * 0.4) % size;
+  const px = (ox * 0.4) % GRID_SIZE;
+  const py = (oy * 0.4) % GRID_SIZE;
   ctx.strokeStyle = C.grid;
   ctx.lineWidth = 1;
   ctx.globalAlpha = 1;
   ctx.beginPath();
-  for (let x = px - size; x < W + size; x += size) {
+  for (let x = px - GRID_SIZE; x < W + GRID_SIZE; x += GRID_SIZE) {
     ctx.moveTo(Math.round(x) + 0.5, 0);
     ctx.lineTo(Math.round(x) + 0.5, H);
   }
-  for (let y = py - size; y < H + size; y += size) {
+  for (let y = py - GRID_SIZE; y < H + GRID_SIZE; y += GRID_SIZE) {
     ctx.moveTo(0, Math.round(y) + 0.5);
     ctx.lineTo(W, Math.round(y) + 0.5);
   }
