@@ -94,7 +94,8 @@ export function renderHelp(ctx) {
 // ── 영구 업그레이드 ────────────────────────────────────────
 export function renderMeta(ctx, save) {
   dim(ctx, 0.85);
-  const pw = 760, ph = 470;
+  // 항목이 9개다. 판을 키우고 줄을 좁혀 한 화면에 담는다
+  const pw = 780, ph = 660;
   const px = (W - pw) / 2, py = (H - ph) / 2;
   panel(ctx, px, py, pw, ph, C.gold);
 
@@ -106,7 +107,7 @@ export function renderMeta(ctx, save) {
   });
 
   const result = { buy: null, back: false, reset: false };
-  let y = py + 104;
+  let y = py + 96;
 
   for (const id of META_IDS) {
     const def = META[id];
@@ -115,16 +116,16 @@ export function renderMeta(ctx, save) {
     const cost = maxed ? 0 : def.costs[lv];
     const afford = !maxed && save.fragments >= cost;
 
-    text(ctx, def.name, px + 34, y + 22, { size: 18, color: C.text });
-    text(ctx, def.desc(lv || 1), px + 34, y + 42, { size: 13, color: C.dim });
-    levelDots(ctx, px + 300, y + 30, lv, def.max, C.gold);
+    text(ctx, def.name, px + 30, y + 19, { size: 17, color: C.text });
+    text(ctx, def.desc(lv || 1), px + 30, y + 37, { size: 12, color: C.dim });
+    levelDots(ctx, px + 330, y + 26, lv, def.max, C.gold);
 
     const label = maxed ? 'MAX' : `${cost}`;
     const color = maxed ? C.dim : afford ? C.gold : '#5a4a20';
-    if (button(ctx, px + pw - 170, y + 6, 130, 40, label, { color, size: 17 }) && afford) {
+    if (button(ctx, px + pw - 160, y + 3, 124, 36, label, { color, size: 16 }) && afford) {
       result.buy = id;
     }
-    y += 62;
+    y += 52;
   }
 
   result.back = button(ctx, px + 34, py + ph - 54, 160, 40, '돌아가기', { size: 17 });

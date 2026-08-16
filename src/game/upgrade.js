@@ -10,10 +10,11 @@ import { weightedIndex } from '../core/rng.js';
  * 매 프레임이 아니라 변경 시에만 호출한다.
  */
 export function recalcStats(p, meta) {
-  const m = meta || { core: 0, memory: 0, fan: 0 };
+  const m = meta || {};
+  const mv = id => m[id] || 0;
   const lv = id => p.passives[id] || 0;
 
-  const dmgMul  = (1 + lv('amp') * PASSIVES.amp.per) * (1 + m.core * 0.04);
+  const dmgMul  = (1 + lv('amp') * PASSIVES.amp.per) * (1 + mv('core') * 0.04);
   /*
    * 출력 증폭은 범위도 같이 넓힌다.
    *
@@ -24,12 +25,16 @@ export function recalcStats(p, meta) {
    */
   const areaMul = 1 + lv('amp') * PASSIVES.amp.area;
   const cdMul   = Math.max(0.35, 1 - lv('clock') * PASSIVES.clock.per);
-  const maxHp   = PLAYER_BASE.maxHp + lv('wall') * PASSIVES.wall.per + m.memory * 10;
+  const maxHp   = PLAYER_BASE.maxHp + lv('wall') * PASSIVES.wall.per + mv('memory') * 10;
   const regen   = lv('wall') * 0.4;
-  const magnet  = PLAYER_BASE.magnet * (1 + lv('cache') * PASSIVES.cache.per);
-  const xpMul   = 1 + lv('cache') * 0.05;
-  const speed   = PLAYER_BASE.speed * (1 + lv('over') * PASSIVES.over.per) * (1 + m.fan * 0.04);
+  const magnet  = PLAYER_BASE.magnet * (1 + lv('cache') * PASSIVES.cache.per) * (1 + mv('magnet') * 0.15);
+  const xpMul   = 1 + lv('cache') * 0.05 + mv('gain') * 0.05;
+  const speed   = PLAYER_BASE.speed * (1 + lv('over') * PASSIVES.over.per) * (1 + mv('fan') * 0.04);
   const dashCd  = PLAYER_BASE.dashCd * (1 - lv('over') * 0.08);
+
+  // 슬롯 상한은 메타가 늘린다. 카드 추첨과 무기 지급이 이 값을 본다
+  p.maxWeapons = MAX_WEAPONS + mv('slot');
+  p.maxPassives = MAX_PASSIVES + mv('mind');
 
   const prevMax = p.stats ? p.stats.maxHp : maxHp;
   p.stats = { dmgMul, areaMul, cdMul, maxHp, regen, magnet, xpMul, speed, dashCd };
@@ -40,7 +45,7 @@ export function recalcStats(p, meta) {
 }
 
 export function giveWeapon(p, id) {
-  if (p.weapons.length >= MAX_WEAPONS) return;
+  if (p.weapons.length >= (p.maxWeapons || MAX_WEAPONS)) return;
   p.weapons.push({ id, lv: 1, slot: p.weapons.length, timer: 0 });
 }
 
@@ -86,7 +91,7 @@ export function buildChoices(p, count = 3) {
     const def = WEAPONS[id];
     const cur = weaponLevel(p, id);
     if (cur === 0) {
-      if (p.weapons.length >= MAX_WEAPONS) continue;
+      if (p.weapons.length >= (p.maxWeapons || MAX_WEAPONS)) continue;
       pool.push({
         kind: 'weapon_new', id, weight: 10,
         name: def.name, color: def.color, icon: def.icon,
@@ -106,7 +111,7 @@ export function buildChoices(p, count = 3) {
     const cur = p.passives[id] || 0;
     const owned = Object.keys(p.passives).length;
     if (cur === 0) {
-      if (owned >= MAX_PASSIVES) continue;
+      if (owned >= (p.maxPassives || MAX_PASSIVES)) continue;
       pool.push({
         kind: 'passive_new', id, weight: 9,
         name: def.name, color: def.color, icon: def.icon,

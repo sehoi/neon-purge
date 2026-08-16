@@ -8,7 +8,7 @@ const VERSION = 1;
 const DEFAULT = {
   v: VERSION,
   fragments: 0,
-  upgrades: { core: 0, memory: 0, fan: 0, prefetch: 0, backup: 0 },
+  upgrades: { core: 0, memory: 0, fan: 0, prefetch: 0, magnet: 0, gain: 0, slot: 0, mind: 0, backup: 0 },
   best: { time: 0, kills: 0, cleared: false, clearTime: 0 },
   achievements: [],   // 달성한 업적 id
   settings: { glow: true, muted: false, shake: 1.0, showFps: false },

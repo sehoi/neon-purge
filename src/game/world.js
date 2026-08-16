@@ -65,7 +65,7 @@ function makePickup() {
 export function createWorld(meta) {
   const world = {
     t: 0,
-    meta: meta || { core: 0, memory: 0, fan: 0, prefetch: 0, backup: 0 },
+    meta: meta || {},
     player: createPlayer(),
     enemies:    createPool(makeEnemy, 400),
     bolts:      createPool(makeBolt, 400),
@@ -89,6 +89,14 @@ export function createWorld(meta) {
     eventLockTimer: 0,
     boss: null,
     bossHpMax: 0,
+    /**
+     * 보스 연출. { kind:'in'|'out', t, dur }
+     *
+     * 최종 보스가 아무 예고 없이 화면 밖에서 걸어들어오면 "또 하나의 큰 적"으로만
+     * 보인다. 등장에 2.6초, 처치에 2.6초를 쓴다 — 그 시간 동안 다른 적은 멈추고
+     * 카메라와 소리만 남는다.
+     */
+    cine: null,
     banner: null,        // { text, life }
     over: false,
     victory: false,
@@ -144,6 +152,7 @@ export function startRun(world) {
   world.runStats.revived = false;
   world.eventLock = false;
   world.boss = null;
+  world.cine = null;
   world.over = false;
   world.victory = false;
   world.banner = null;
@@ -315,6 +324,7 @@ const API = {
 
   // ── 데미지 ──────────────────────────────────────────────
   damageEnemy(e, dmg, kx = 0, ky = 0) {
+    if (e.invuln) return;
     if (!e.alive) return;
     e.hp -= dmg;
     e.flash = 0.08;
@@ -338,7 +348,11 @@ const API = {
     if (e.def.elite || e.def.boss) {
       addShake(14);
       addHitstop(0.12);
-      if (e.def.boss) { this.victory = true; this.boss = null; }
+      if (e.def.boss) {
+        // 승리 판정은 연출이 끝난 뒤에 낸다. 바로 결과창이 뜨면 이긴 순간을 못 본다
+        this.cine = { kind: 'out', t: 0, dur: 2.6, x: e.x, y: e.y, color: e.def.color };
+        this.boss = null;
+      }
       if (this.boss === e) this.boss = null;
       // 엘리트가 여럿 등장하는 웨이브에서는 전부 처치해야 잠금이 풀린다
       let remaining = 0;
@@ -395,10 +409,37 @@ const API = {
       this.sfx('elite');
       addShake(18);
       this.enemies.forEach(e => { if (!e.def.elite) e.alive = false; });
-      const b = this.spawnEnemy('kernel', this.player.x + 500, this.player.y);
+      // 화면 밖이 아니라 눈앞에 조립되며 나타난다
+      const b = this.spawnEnemy('kernel', this.player.x + 330, this.player.y);
+      if (b) { b.frozen = true; b.invuln = true; b.spawnScale = 0; }
       this.boss = b;
       this.bossHpMax = b ? b.maxHp : 0;
+      this.cine = { kind: 'in', t: 0, dur: 2.6 };
     }
+  },
+
+  /**
+   * 몸 주위 상시 피해 장판.
+   *
+   * 궤도 노드가 "도는 점"이라 사이가 비는 것과 달리 빈틈이 없다. 대신 반경이
+   * 짧아 붙는 적만 잡는다 — 파고드는 적을 알아서 녹이는 자리다.
+   *
+   * tick 간격으로만 판정한다. 매 프레임 때리면 초당 60번이라 수치가 무의미해지고
+   * 판정 비용도 그만큼 든다.
+   */
+  zapField(w, radius, dmg, tick, dt, color) {
+    w.fieldTimer = (w.fieldTimer || 0) - dt;
+    w.fieldR = radius;
+    w.fieldColor = color;
+    if (w.fieldTimer > 0) return;
+    w.fieldTimer += tick;
+    if (w.fieldTimer < 0) w.fieldTimer = tick;
+
+    const p = this.player;
+    _fieldWorld = this; _fieldR = radius; _fieldDmg = dmg;
+    _fieldSlot = w.slot; _fieldColor = color; _fieldX = p.x; _fieldY = p.y;
+    this.grid.query(p.x, p.y, radius + 40, _fieldHitCb);
+    this.sfx('hit');
   },
 
   showBanner(text) {
@@ -418,6 +459,8 @@ export function updateWorld(world, dt) {
     world.banner.life -= dt;
     if (world.banner.life <= 0) world.banner = null;
   }
+
+  if (world.cine) dt = stepCine(world, dt);
 
   // 엘리트를 오래 방치해도 게임이 멈춰 있지 않도록 잠금에 상한을 둔다 (보스는 예외)
   if (world.eventLock && !world.boss) {
@@ -506,6 +549,19 @@ function _boltHitCb(e) {
   if (!b.pierce) { b.alive = false; _hitDone = true; }
 }
 
+// 장판 판정. 인라인 클로저를 만들지 않으려고 컨텍스트를 모듈 변수로 넘긴다.
+let _fieldWorld = null, _fieldR = 0, _fieldDmg = 0, _fieldSlot = 0;
+let _fieldColor = '', _fieldX = 0, _fieldY = 0;
+
+function _fieldHitCb(e) {
+  if (!e.alive) return;
+  const d2 = dist2(_fieldX, _fieldY, e.x, e.y);
+  const reach = _fieldR + e.r;
+  if (d2 > reach * reach) return;
+  _fieldWorld.damageEnemy(e, _fieldDmg, 0, 0);
+  flash(e.x, e.y, _fieldColor, 12);
+}
+
 let _ringCur = null;
 
 function _ringHitCb(e) {
@@ -535,11 +591,57 @@ function _orbHitCb(e) {
   flash(o.x, o.y, o.color, 10);
 }
 
+/**
+ * 보스 연출을 한 프레임 진행하고, 그동안 월드가 쓸 dt 를 돌려준다.
+ *
+ * 등장에는 dt 를 0 으로 줘서 완전히 멈추고, 처치에는 0.25 배로 늦춘다 —
+ * 완전히 멈추면 이긴 게 아니라 게임이 멎은 것처럼 보인다.
+ */
+function stepCine(world, dt) {
+  const c = world.cine;
+  c.t += dt;
+  const k = Math.min(1, c.t / c.dur);
+
+  if (c.kind === 'in') {
+    const b = world.boss;
+    if (b) {
+      b.spawnScale = k;
+      // 사방에서 조각이 모여들며 몸을 이룬다
+      if (world.t % 0.02 < dt) {
+        const a = rnd() * Math.PI * 2;
+        const r = 420 * (1 - k) + 60;
+        zapLine(b.x + Math.cos(a) * r, b.y + Math.sin(a) * r, b.x, b.y, b.def.color);
+      }
+    }
+    if (k >= 1) {
+      if (b) { b.frozen = false; b.invuln = false; b.spawnScale = 1; }
+      world.cine = null;
+      world.showBanner('정화 개시');
+      addShake(20);
+      world.sfx('emp');
+    }
+    return 0;                      // 등장 동안 월드는 멈춘다
+  }
+
+  // 처치 — 고리가 퍼지고 파편이 튄다
+  if (c.t % 0.18 < dt) {
+    burst(c.x, c.y, c.color, 14, 420, 7);
+    addShake(10);
+  }
+  if (k >= 1) {
+    world.cine = null;
+    world.victory = true;
+    world.eventLock = false;
+  }
+  return dt * 0.25;                // 처치는 늦게 흐른다
+}
+
 function updateEnemies(world, dt) {
   const p = world.player;
 
   world.enemies.forEach(e => {
     e.flash = Math.max(0, e.flash - dt);
+    if (e.frozen) return;          // 등장 연출 중인 보스는 움직이지도 때리지도 않는다
     e.rot += e.spin * dt;
 
     e.def.behavior(e, world, dt);

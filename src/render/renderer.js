@@ -93,8 +93,10 @@ export function renderWorld(ctx, world) {
   drawEnemies(ctx, world, visible);
   drawEnemyShots(ctx, world, visible);
   drawPlayerAttacks(ctx, world, visible);
+  drawFields(ctx, world);
   drawPlayer(ctx, world);
   drawParticles(ctx, visible);
+  drawCine(ctx, world);
 
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -194,6 +196,58 @@ function drawPickups(ctx, world, visible) {
   }
 }
 
+/**
+ * 보스 연출. 등장에는 조여드는 고리를, 처치에는 퍼지는 섬광을 그린다.
+ * 월드가 멈춰 있는 동안 화면에 아무 일도 안 일어나면 멎은 것처럼 보인다.
+ */
+/** 감전 장판 — 플레이어를 감싼 고리. 어디까지 닿는지 보여야 붙이고 뗄 수 있다. */
+function drawFields(ctx, world) {
+  const p = world.player;
+  for (const w of p.weapons) {
+    if (!w.fieldR) continue;
+    neon(ctx, w.fieldColor || C.cyan, 2, () => circle(ctx, p.x, p.y, w.fieldR));
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = w.fieldColor || C.cyan;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, w.fieldR, 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawCine(ctx, world) {
+  const c = world.cine;
+  if (!c) return;
+  const k = Math.min(1, c.t / c.dur);
+
+  if (c.kind === 'in') {
+    const b = world.boss;
+    if (!b) return;
+    ctx.save();
+    ctx.globalAlpha = 0.9 * (1 - k);
+    ctx.strokeStyle = b.def.color;
+    ctx.lineWidth = 4;
+    for (let i = 0; i < 3; i++) {
+      const t = Math.min(1, k + i * 0.14);
+      circle(ctx, b.x, b.y, 520 * (1 - t) + b.r);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // 처치 — 고리가 세 겹으로 퍼진다
+  ctx.save();
+  ctx.strokeStyle = c.color;
+  for (let i = 0; i < 3; i++) {
+    const t = Math.min(1, Math.max(0, k - i * 0.16) / 0.84);
+    if (t <= 0) continue;
+    ctx.globalAlpha = 0.75 * (1 - t);
+    ctx.lineWidth = 6 * (1 - t) + 1;
+    circle(ctx, c.x, c.y, 40 + t * 780);
+  }
+  ctx.restore();
+}
+
 function drawEnemies(ctx, world, visible) {
   clearGroups(_enemyGroups);
   world.enemies.forEach(e => {
@@ -206,8 +260,11 @@ function drawEnemies(ctx, world, visible) {
     const big = list[0].def.elite || list[0].def.boss;
     (big ? neonFull : neon)(ctx, col, big ? 3 : 2, () => {
       for (const e of list) {
-        if (e.def.shape === 'star') star(ctx, e.x, e.y, e.r, e.def.sides, e.rot);
-        else polygon(ctx, e.x, e.y, e.r, e.def.sides, e.rot);
+        // 등장 연출 중이면 커지면서 나타난다 (spawnScale 0 → 1)
+        const s = e.spawnScale != null && e.spawnScale < 1 ? e.spawnScale : 1;
+        const rr = e.r * (0.3 + s * 0.7);
+        if (e.def.shape === 'star') star(ctx, e.x, e.y, rr, e.def.sides, e.rot);
+        else polygon(ctx, e.x, e.y, rr, e.def.sides, e.rot);
       }
     });
   }
@@ -227,7 +284,7 @@ function drawEnemies(ctx, world, visible) {
       line(ctx, e.x, e.y, e.x + e._tx * 320, e.y + e._ty * 320);
       ctx.restore();
     }
-    if (e.def.elite || e.def.boss) {
+    if ((e.def.elite || e.def.boss) && !(e.spawnScale != null && e.spawnScale < 1)) {
       ctx.save();
       ctx.globalAlpha = 0.75;
       ctx.strokeStyle = e.def.color;

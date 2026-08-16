@@ -7,6 +7,11 @@
 
 import { C } from '../config.js';
 
+/** 조각마다 속도를 조금씩 흔든다. 프레임마다 바뀌면 안 되므로 인덱스 기반. */
+function rnd01(i) {
+  return ((Math.sin(i * 12.9898) * 43758.5453) % 1 + 1) % 1;
+}
+
 export const WEAPONS = {
   pulse: {
     id: 'pulse', name: '충격 파동', color: C.cyan, icon: 'ring',
@@ -115,6 +120,60 @@ export const WEAPONS = {
     },
   },
 
+  /*
+   * 파편탄 — 부채꼴로 흩뿌린다.
+   * 추적탄이 "한 놈을 정확히"라면 이쪽은 "앞쪽 전부를 대충". 조합의 결이 다르다.
+   */
+  shard: {
+    id: 'shard', name: '파편탄', color: '#ff9ad5', icon: 'bolt',
+    blurb: '앞쪽으로 부채꼴로 흩뿌린다. 뭉친 무리에 강하다',
+    evolveWith: 'clock', evolveTo: 'flechette',
+    levels: [
+      { dmg: 7,  count: 4, spread: 0.55, cd: 1.05, spd: 420 },
+      { dmg: 8,  count: 5, spread: 0.60, cd: 0.95, spd: 440 },
+      { dmg: 10, count: 6, spread: 0.68, cd: 0.88, spd: 460 },
+      { dmg: 11, count: 8, spread: 0.76, cd: 0.80, spd: 480 },
+      { dmg: 13, count: 10, spread: 0.85, cd: 0.72, spd: 500 },
+    ],
+    desc: L => `데미지 ${L.dmg} · ${L.count}조각`,
+    fire(world, w, L, dmg, area = 1) {
+      const p = world.player;
+      const target = world.nearestEnemy(p.x, p.y, 700);
+      const base = target ? Math.atan2(target.y - p.y, target.x - p.x)
+                          : Math.atan2(p.faceY, p.faceX);
+      for (let i = 0; i < L.count; i++) {
+        const t = L.count === 1 ? 0 : (i / (L.count - 1) - 0.5) * 2;
+        const a = base + t * L.spread;
+        const spd = L.spd * (0.85 + rnd01(i) * 0.3);
+        world.spawnBolt(p.x, p.y, Math.cos(a) * spd, Math.sin(a) * spd,
+          dmg, w.slot, { r: 4 * area, color: '#ff9ad5', life: 0.85 });
+      }
+      world.sfx('shoot');
+    },
+  },
+
+  /*
+   * 감전 장판 — 몸 주위를 상시 지진다.
+   * 궤도 노드가 "도는 점"이라면 이쪽은 "붙어 있는 면". 붙는 적을 알아서 녹인다.
+   */
+  field: {
+    id: 'field', name: '감전 장판', color: '#8be9ff', icon: 'ring',
+    blurb: '몸 주위를 계속 지진다. 붙는 적이 알아서 녹는다',
+    continuous: true,
+    evolveWith: 'wall', evolveTo: 'aegis',
+    levels: [
+      { dmg: 14, radius: 92,  tick: 0.5 },
+      { dmg: 17, radius: 104, tick: 0.46 },
+      { dmg: 21, radius: 116, tick: 0.42 },
+      { dmg: 25, radius: 130, tick: 0.38 },
+      { dmg: 30, radius: 146, tick: 0.34 },
+    ],
+    desc: L => `초당 ${Math.round(L.dmg / L.tick)} · 반경 ${L.radius}`,
+    sustain(world, w, L, dmg, dt, area = 1) {
+      world.zapField(w, L.radius * area, dmg, L.tick, dt, '#8be9ff');
+    },
+  },
+
   // ── 진화형 ────────────────────────────────────────────────
   supernova: {
     id: 'supernova', name: '초신성', color: '#ffffff', icon: 'ring', evolved: true,
@@ -175,6 +234,37 @@ export const WEAPONS = {
     },
   },
 
+  flechette: {
+    id: 'flechette', name: '관통 파편', color: '#ffd2ec', icon: 'bolt', evolved: true,
+    blurb: '부채꼴 전체가 적을 꿰뚫고 지나간다',
+    levels: [{ dmg: 22, count: 14, spread: 1.0, cd: 0.6, spd: 620 }],
+    desc: L => `데미지 ${L.dmg} · ${L.count}조각 · 관통`,
+    fire(world, w, L, dmg, area = 1) {
+      const p = world.player;
+      const target = world.nearestEnemy(p.x, p.y, 900);
+      const base = target ? Math.atan2(target.y - p.y, target.x - p.x)
+                          : Math.atan2(p.faceY, p.faceX);
+      for (let i = 0; i < L.count; i++) {
+        const t = (i / (L.count - 1) - 0.5) * 2;
+        const a = base + t * L.spread;
+        world.spawnBolt(p.x, p.y, Math.cos(a) * L.spd, Math.sin(a) * L.spd,
+          dmg, w.slot, { r: 5 * area, color: '#ffd2ec', life: 1.0, pierce: true, hitCd: 0.35 });
+      }
+      world.sfx('shoot');
+    },
+  },
+
+  aegis: {
+    id: 'aegis', name: '방전 결계', color: '#d6f7ff', icon: 'ring', evolved: true,
+    blurb: '몸을 감싼 결계가 닿는 것을 전부 태운다',
+    continuous: true,
+    levels: [{ dmg: 58, radius: 210, tick: 0.28 }],
+    desc: L => `초당 ${Math.round(L.dmg / L.tick)} · 반경 ${L.radius}`,
+    sustain(world, w, L, dmg, dt, area = 1) {
+      world.zapField(w, L.radius * area, dmg, L.tick, dt, '#d6f7ff');
+    },
+  },
+
   grid: {
     id: 'grid', name: '빔 격자', color: '#ff9a6b', icon: 'laser', evolved: true,
     blurb: '여섯 줄이 격자로 돌며 화면을 썬다',
@@ -192,5 +282,5 @@ export const WEAPONS = {
   },
 };
 
-export const BASE_WEAPON_IDS = ['pulse', 'tracer', 'orbit', 'chain', 'laser'];
+export const BASE_WEAPON_IDS = ['pulse', 'tracer', 'orbit', 'chain', 'laser', 'shard', 'field'];
 export const MAX_WEAPONS = 4;
