@@ -17,57 +17,76 @@ import { WEAPONS } from './weapons.js';
 
 export const ACHIEVEMENTS = [
   {
-    id: 'first_run', name: '첫 접속', desc: '한 판을 끝까지 플레이한다',
+    id: 'first_run', name: '첫 접속', desc: '한 판을 끝까지 플레이한다', reward: 150,
     check: () => true,
   },
   {
-    id: 'first_clear', name: '정화 완료', desc: '커널 바이러스를 처치한다',
+    id: 'first_clear', name: '정화 완료', desc: '커널 바이러스를 처치한다', reward: 600,
     check: c => c.victory,
   },
   {
-    id: 'swarm', name: '대청소', desc: '한 판에 2,000마리를 처치한다',
+    id: 'swarm', name: '대청소', desc: '한 판에 2,000마리를 처치한다', reward: 400,
     check: c => c.kills >= 2000,
   },
   {
-    id: 'deep_dive', name: '심층 침투', desc: '레벨 25에 도달한다',
+    id: 'deep_dive', name: '심층 침투', desc: '레벨 25에 도달한다', reward: 300,
     check: c => c.level >= 25,
   },
   {
-    id: 'evolved', name: '진화의 끝', desc: '진화 무기를 2종 이상 보유한 채 클리어한다',
+    id: 'evolved', name: '진화의 끝', desc: '진화 무기를 2종 이상 보유한 채 클리어한다', reward: 700,
     check: c => c.victory && c.evolvedCount >= 2,
   },
   {
-    id: 'solo_weapon', name: '한 자루로 충분해', desc: '무기 하나만 들고 클리어한다',
+    id: 'solo_weapon', name: '한 자루로 충분해', desc: '무기 하나만 들고 클리어한다', reward: 1200,
     check: c => c.victory && c.weapons.length === 1,
   },
   {
-    id: 'pure_pulse', name: '파동만으로', desc: '충격 파동 계열만 들고 클리어한다',
+    id: 'pure_pulse', name: '파동만으로', desc: '충격 파동 계열만 들고 클리어한다', reward: 1500,
     check: c => c.victory && c.weapons.every(w => w.id === 'pulse' || w.id === 'supernova'),
   },
   {
-    id: 'no_passive', name: '맨몸', desc: '강화를 하나도 고르지 않고 클리어한다',
+    id: 'no_passive', name: '맨몸', desc: '강화를 하나도 고르지 않고 클리어한다', reward: 1500,
     check: c => c.victory && Object.keys(c.passives).length === 0,
   },
   {
-    id: 'untouched', name: '무결점', desc: '한 번도 맞지 않고 5분을 버틴다',
+    id: 'untouched', name: '무결점', desc: '한 번도 맞지 않고 5분을 버틴다', reward: 800,
     check: c => c.hitsTaken === 0 && c.time >= 300,
   },
   {
-    id: 'speedrun', name: '속전속결', desc: '9분 안에 클리어한다',
+    id: 'speedrun', name: '속전속결', desc: '9분 안에 클리어한다', reward: 1000,
     check: c => c.victory && c.time <= 540,
   },
   {
-    id: 'phoenix', name: '재기동', desc: '부활한 뒤 그 판을 클리어한다',
+    id: 'phoenix', name: '재기동', desc: '부활한 뒤 그 판을 클리어한다', reward: 600,
     check: c => c.victory && c.revived,
   },
   {
-    id: 'arsenal', name: '무기고', desc: '무기 4종을 모두 만렙으로 만든다',
-    check: c => c.weapons.length === 4 &&
+    id: 'arsenal', name: '무기고', desc: '무기 4종을 모두 만렙으로 만든다', reward: 900,
+    // 무기 슬롯 메타를 사면 최대치가 5가 된다. 개수를 못박지 않고 "꽉 채웠는가"로 본다
+    check: c => c.weapons.length >= 4 &&
+                c.weapons.length >= (c.maxWeapons || 4) &&
                 c.weapons.every(w => w.lv >= 5 || WEAPONS[w.id].evolved),
   },
 ];
 
 export const ACHIEVEMENT_COUNT = ACHIEVEMENTS.length;
+
+/**
+ * 업적 보상 합계 — 전부 달성하면 이만큼.
+ * 영구 업그레이드 총액(약 70,000)의 14% 남짓이다. 초반을 밀어주되
+ * 업적만으로 다 사지는 못하게 하는 선.
+ */
+export function totalAchievementReward() {
+  return ACHIEVEMENTS.reduce((s, a) => s + (a.reward || 0), 0);
+}
+
+/** 방금 달성한 업적들이 주는 조각 합계. */
+export function rewardFor(ids) {
+  return ids.reduce((s, id) => {
+    const a = ACHIEVEMENTS.find(x => x.id === id);
+    return s + (a && a.reward ? a.reward : 0);
+  }, 0);
+}
 
 /**
  * 이번 판에서 새로 달성한 업적 id 목록.

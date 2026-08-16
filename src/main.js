@@ -18,7 +18,7 @@ import {
   renderResetConfirm, renderAchievements,
 } from './ui/screens.js';
 import { META, fragmentsEarned } from './data/meta.js';
-import { ACHIEVEMENTS, evaluateAchievements } from './data/achievements.js';
+import { ACHIEVEMENTS, evaluateAchievements, rewardFor } from './data/achievements.js';
 import { WEAPONS } from './data/weapons.js';
 
 const canvas = document.getElementById('game');
@@ -86,6 +86,7 @@ let levelAnim = 0;
 let resultGained = 0;
 let resultVictory = false;
 let newAchievements = [];
+let resultAchReward = 0;
 let titleTime = 0;
 
 initInput(canvas, () => {
@@ -158,10 +159,15 @@ function endRun(victory) {
     hitsTaken: world.runStats.hitsTaken,
     revived: world.runStats.revived,
     evolvedCount: p.weapons.filter(w => WEAPONS[w.id].evolved).length,
+    maxWeapons: p.maxWeapons || 4,
   };
   const unlocked = evaluateAchievements(ctxRun, save.achievements);
   save.achievements.push(...unlocked);
   newAchievements = unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id)).filter(Boolean);
+
+  // 업적 보상은 판 수확과 따로 센다 — 결과 화면에서 어디서 온 조각인지 보여야 한다
+  resultAchReward = rewardFor(unlocked);
+  save.fragments += resultAchReward;
 
   persist();
   stopMusic();
@@ -353,7 +359,7 @@ function render() {
 
     case S.RESULT: {
       renderWorld(ctx, world);
-      const r = renderResult(ctx, world, resultGained, resultVictory, newAchievements);
+      const r = renderResult(ctx, world, resultGained, resultVictory, newAchievements, resultAchReward);
       if (r.retry) { sfx('select'); beginRun(); }
       if (r.title) { sfx('select'); state = S.TITLE; }
       break;

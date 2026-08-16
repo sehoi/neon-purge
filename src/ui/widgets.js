@@ -90,6 +90,28 @@ export function icon(ctx, kind, x, y, r, color) {
       ctx.stroke();
       disc(ctx, x + r * 0.7, y, r * 0.3);
       break;
+    case 'shard':
+      // 한 점에서 부채꼴로 흩어지는 조각들 — 추적탄(bolt)과 확실히 구분된다
+      for (let i = -1; i <= 1; i++) {
+        const a = i * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.75, y);
+        ctx.lineTo(x + Math.cos(a) * r * 0.75, y + Math.sin(a) * r * 0.75);
+        ctx.stroke();
+        disc(ctx, x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8, r * 0.18);
+      }
+      break;
+    case 'field':
+      // 가운데 점을 둘러싼 끊어진 고리 — 충격 파동(ring)의 이중 원과 구분된다
+      disc(ctx, x, y, r * 0.28);
+      for (let i = 0; i < 6; i++) {
+        const a0 = (i / 6) * Math.PI * 2 + 0.12;
+        const a1 = a0 + Math.PI / 4.2;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.85, a0, a1);
+        ctx.stroke();
+      }
+      break;
     case 'orbit':
       circle(ctx, x, y, r * 0.85);
       disc(ctx, x + r * 0.85, y, r * 0.25);

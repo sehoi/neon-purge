@@ -191,6 +191,10 @@ export function renderAchievements(ctx, save) {
     ctx.globalAlpha = got ? 1 : 0.4;
     icon(ctx, got ? 'boot' : 'shield', x + 16, y + 14, 12, got ? C.gold : C.dim);
     text(ctx, a.name, x + 38, y + 10, { size: 16, color: got ? C.text : C.dim });
+    if (a.reward) {
+      text(ctx, got ? '받음' : `+${a.reward}`, x + colW - 12, y + 10,
+        { size: 13, align: 'right', color: got ? C.dim : C.gold });
+    }
     text(ctx, a.desc, x + 38, y + 30, { size: 12, color: got ? C.dim : '#4a5578' });
     ctx.restore();
   });
@@ -325,9 +329,9 @@ export function renderPause(ctx, world) {
 }
 
 // ── 결과 ──────────────────────────────────────────────────
-export function renderResult(ctx, world, gained, isVictory, newAchievements = []) {
+export function renderResult(ctx, world, gained, isVictory, newAchievements = [], achReward = 0) {
   dim(ctx, 0.85);
-  const pw = 620, ph = newAchievements.length ? 470 : 420;
+  const pw = 620, ph = newAchievements.length ? 490 : 420;
   const px = (W - pw) / 2, py = (H - ph) / 2;
   panel(ctx, px, py, pw, ph, isVictory ? C.lime : C.red);
 
@@ -368,12 +372,17 @@ export function renderResult(ctx, world, gained, isVictory, newAchievements = []
   // 이번 판에 새로 달성한 업적
   if (newAchievements.length) {
     const ay = y + 46;
-    text(ctx, '업적 달성', px + 70, ay, { size: 14, color: C.gold });
+    text(ctx, achReward > 0 ? `업적 달성  +${achReward} 조각` : '업적 달성',
+      px + 70, ay, { size: 14, color: C.gold });
     newAchievements.slice(0, 3).forEach((a, i) => {
-      text(ctx, `· ${a.name}`, px + 70, ay + 22 + i * 20, { size: 15, color: C.text });
+      const ry = ay + 22 + i * 20;
+      text(ctx, `· ${a.name}`, px + 70, ry, { size: 15, color: C.text });
+      if (a.reward) {
+        text(ctx, `+${a.reward}`, px + pw - 70, ry, { size: 14, align: 'right', color: C.gold });
+      }
     });
     if (newAchievements.length > 3) {
-      text(ctx, `외 ${newAchievements.length - 3}개`, px + pw - 70, ay + 22,
+      text(ctx, `외 ${newAchievements.length - 3}개`, px + pw - 70, ay + 22 + 3 * 20,
         { size: 13, align: 'right', color: C.dim });
     }
   }

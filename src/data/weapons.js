@@ -125,7 +125,7 @@ export const WEAPONS = {
    * 추적탄이 "한 놈을 정확히"라면 이쪽은 "앞쪽 전부를 대충". 조합의 결이 다르다.
    */
   shard: {
-    id: 'shard', name: '파편탄', color: '#ff9ad5', icon: 'bolt',
+    id: 'shard', name: '파편탄', color: '#ff9ad5', icon: 'shard',
     blurb: '앞쪽으로 부채꼴로 흩뿌린다. 뭉친 무리에 강하다',
     evolveWith: 'clock', evolveTo: 'flechette',
     levels: [
@@ -157,7 +157,7 @@ export const WEAPONS = {
    * 궤도 노드가 "도는 점"이라면 이쪽은 "붙어 있는 면". 붙는 적을 알아서 녹인다.
    */
   field: {
-    id: 'field', name: '감전 장판', color: '#8be9ff', icon: 'ring',
+    id: 'field', name: '감전 장판', color: '#8be9ff', icon: 'field',
     blurb: '몸 주위를 계속 지진다. 붙는 적이 알아서 녹는다',
     continuous: true,
     evolveWith: 'wall', evolveTo: 'aegis',
@@ -235,7 +235,7 @@ export const WEAPONS = {
   },
 
   flechette: {
-    id: 'flechette', name: '관통 파편', color: '#ffd2ec', icon: 'bolt', evolved: true,
+    id: 'flechette', name: '관통 파편', color: '#ffd2ec', icon: 'shard', evolved: true,
     blurb: '부채꼴 전체가 적을 꿰뚫고 지나간다',
     levels: [{ dmg: 22, count: 14, spread: 1.0, cd: 0.6, spd: 620 }],
     desc: L => `데미지 ${L.dmg} · ${L.count}조각 · 관통`,
@@ -255,7 +255,7 @@ export const WEAPONS = {
   },
 
   aegis: {
-    id: 'aegis', name: '방전 결계', color: '#d6f7ff', icon: 'ring', evolved: true,
+    id: 'aegis', name: '방전 결계', color: '#d6f7ff', icon: 'field', evolved: true,
     blurb: '몸을 감싼 결계가 닿는 것을 전부 태운다',
     continuous: true,
     levels: [{ dmg: 58, radius: 210, tick: 0.28 }],
