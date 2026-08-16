@@ -41,6 +41,11 @@ let _lowDetail = false;
 // 모바일 GPU 는 훨씬 일찍 무릎을 꿇으므로 임계값을 낮게 잡는다.
 const DETAIL_THRESHOLD = IS_TOUCH ? 120 : 260;
 
+/** 플레이어를 지나는 직선이 화면을 덮는 데 필요한 반길이. 카메라 오프셋만큼 여유를 둔다. */
+function _beamHalfLen() {
+  return Math.hypot(W, H) * 0.5 + 260;
+}
+
 function updateDetailLevel(world) {
   _lowDetail = world.enemies.count + particles.count > DETAIL_THRESHOLD;
 }
@@ -336,11 +341,27 @@ function drawPlayerAttacks(ctx, world, visible) {
   });
 
   // 빔 — 화면을 가로지르는 긴 선이라 글로우 비용에 가장 민감하다
+  /*
+   * 빔은 길이가 곧 비용이다.
+   *
+   * 예전엔 무조건 반길이 1400(총 2800px)을 이중 스트로크로 그었다. 빔이 한둘일
+   * 때는 괜찮았는데, 진화형 '빔 격자'가 동시에 12줄까지 띄우면서 렌더 p99 가
+   * 15ms 로 튀었다. neonFull 은 "빔처럼 수가 적고 중요한 것" 전제로 글로우를
+   * 강제하는데, 그 전제가 깨진 것이다.
+   *
+   *  - 화면 대각선 밖은 그릴 이유가 없다. 반길이를 화면에 맞춘다
+   *  - 줄이 많으면 글로우 겹침이 어차피 안 보인다. 굵기와 패스를 줄인다
+   */
+  const beamHalf = _beamHalfLen();
+  // 폰은 큰 반투명 면에서 무릎을 꿇는다. 줄이 셋만 넘어도 글로우를 접는다
+  const manyBeams = world.beams.count > (IS_TOUCH ? 3 : 4);
+  const beamW = manyBeams ? (IS_TOUCH ? 3 : 3.5) : 5;
   world.beams.forEach(b => {
     const a = Math.min(1, b.life / 0.3);
-    const ca = Math.cos(b.angle) * 1400, sa = Math.sin(b.angle) * 1400;
-    ctx.globalAlpha = a * 0.9;
-    neonFull(ctx, b.color, 5, () => line(ctx, p.x - ca, p.y - sa, p.x + ca, p.y + sa));
+    const ca = Math.cos(b.angle) * beamHalf, sa = Math.sin(b.angle) * beamHalf;
+    ctx.globalAlpha = a * (manyBeams ? 0.75 : 0.9);
+    (manyBeams ? neon : neonFull)(ctx, b.color, beamW,
+      () => line(ctx, p.x - ca, p.y - sa, p.x + ca, p.y + sa));
     ctx.globalAlpha = 1;
   });
 

@@ -279,7 +279,13 @@ export const WEAPONS = {
   grid: {
     id: 'grid', name: '빔 격자', color: '#ff9a6b', icon: 'laser', evolved: true,
     blurb: '여섯 줄이 격자로 돌며 화면을 썬다',
-    levels: [{ dmg: 52, beams: 6, cd: 2.2, spin: 1.8, life: 3.4 }],
+        /*
+     * life 3.4 / cd 2.2 라 6줄이 겹쳐 동시에 12줄까지 떴다. 폰에서는 그만큼
+     * 화면 전체를 반투명하게 두 번 덧칠하는 셈이라 채움 비용이 폭증한다.
+     * 수명을 줄여 최대 겹침을 12 -> 8 로 낮추고, 대신 피해량을 올려 총량을 지켰다.
+     * 클럭 가속 만렙이면 쿨다운이 30% 줄어 겹침이 다시 늘어난다 - 그것까지 감안한 값이다.
+     */
+    levels: [{ dmg: 72, beams: 4, cd: 1.7, spin: 1.9, life: 1.9 }],
     desc: L => `데미지 ${L.dmg} · ${L.beams}줄 · 굵고 오래간다`,
     fire(world, w, L, dmg, area = 1) {
       const base = Math.random() * Math.PI;
