@@ -10,6 +10,8 @@ const DEFAULT = {
   fragments: 0,
   upgrades: { core: 0, memory: 0, fan: 0, prefetch: 0, magnet: 0, gain: 0, slot: 0, mind: 0, backup: 0 },
   best: { time: 0, kills: 0, cleared: false, clearTime: 0 },
+  startWeapon: 'pulse',
+  unlockedWeapons: ['pulse'],   // 나머지는 조각으로 연다
   achievements: [],   // 달성한 업적 id
   settings: { glow: true, muted: false, shake: 1.0, showFps: false },
 };
@@ -31,6 +33,8 @@ export function loadSave() {
         data.best = Object.assign(clone(DEFAULT.best), parsed.best);
         data.settings = Object.assign(clone(DEFAULT.settings), parsed.settings);
         data.achievements = Array.isArray(parsed.achievements) ? parsed.achievements.slice() : [];
+        data.unlockedWeapons = Array.isArray(parsed.unlockedWeapons) && parsed.unlockedWeapons.length
+          ? parsed.unlockedWeapons.slice() : ['pulse'];
       }
     }
   } catch {

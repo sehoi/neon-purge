@@ -15,7 +15,7 @@ import { renderWorld } from './render/renderer.js';
 import { renderHud } from './ui/hud.js';
 import {
   renderTitle, renderHelp, renderMeta, renderLevelUp, renderPause, renderResult,
-  renderResetConfirm, renderAchievements,
+  renderResetConfirm, renderAchievements, renderStartWeapon, START_WEAPON_COST,
 } from './ui/screens.js';
 import { META, fragmentsEarned } from './data/meta.js';
 import { ACHIEVEMENTS, evaluateAchievements, rewardFor } from './data/achievements.js';
@@ -77,7 +77,7 @@ const world = createWorld(save.upgrades);
 
 const S = {
   TITLE: 'title', HELP: 'help', META: 'meta', RESET_CONFIRM: 'resetConfirm',
-  ACHIEVEMENTS: 'achievements',
+  ACHIEVEMENTS: 'achievements', WEAPON: 'weapon',
   PLAYING: 'playing', PAUSED: 'paused', LEVELUP: 'levelup', RESULT: 'result',
 };
 let state = S.TITLE;
@@ -108,6 +108,9 @@ addEventListener('focus', wakeAudio);
 
 function beginRun() {
   world.meta = save.upgrades;
+  // startRun 이 읽는 값. 저장된 선택이 잠겨 있으면 기본 무기로 되돌린다
+  world.meta.startWeapon = save.unlockedWeapons.includes(save.startWeapon)
+    ? save.startWeapon : 'pulse';
   startRun(world);
   state = S.PLAYING;
   startMusic();
@@ -185,6 +188,7 @@ function update(dt) {
     case S.TITLE:
     case S.HELP:
     case S.META:
+    case S.WEAPON:
       titleTime += dt;
       break;
 
@@ -267,6 +271,7 @@ function render() {
       if (r.upgrade) { sfx('select'); state = S.META; }
       if (r.help) { sfx('select'); state = S.HELP; }
       if (r.achievements) { sfx('select'); state = S.ACHIEVEMENTS; }
+      if (r.weapon) { sfx('select'); state = S.WEAPON; }
       if (r.fullscreen) {
         sfx('select');
         // 전체화면 요청은 사용자 제스처 안에서만 허용된다. 실패해도 게임은 계속 돈다.
@@ -279,6 +284,21 @@ function render() {
     case S.HELP: {
       renderWorld(ctx, world);
       const r = renderHelp(ctx);
+      if (r.back) { sfx('select'); state = S.TITLE; }
+      break;
+    }
+
+    case S.WEAPON: {
+      renderWorld(ctx, world);
+      const r = renderStartWeapon(ctx, save);
+      if (r.pick) { sfx('select'); save.startWeapon = r.pick; persist(); }
+      if (r.buy && save.fragments >= START_WEAPON_COST) {
+        save.fragments -= START_WEAPON_COST;
+        save.unlockedWeapons.push(r.buy);
+        save.startWeapon = r.buy;
+        sfx('levelup');
+        persist();
+      }
       if (r.back) { sfx('select'); state = S.TITLE; }
       break;
     }

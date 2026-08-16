@@ -5,7 +5,7 @@ import { text, panel, button, icon, formatTime, levelDots } from './widgets.js';
 import { input, keyPressed, consumeTap } from '../core/input.js';
 import { META, META_IDS } from '../data/meta.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
-import { WEAPONS } from '../data/weapons.js';
+import { WEAPONS, BASE_WEAPON_IDS } from '../data/weapons.js';
 import { PASSIVES, MAX_LEVEL } from '../data/passives.js';
 
 function dim(ctx, alpha = 0.72) {
@@ -28,16 +28,19 @@ export function renderTitle(ctx, save) {
 
   const bw = 300, bh = 50, bx = (W - bw) / 2;
   const done = save.achievements.length;
+  const startDef = WEAPONS[save.startWeapon] || WEAPONS.pulse;
   const r = {
-    start:   button(ctx, bx, 286, bw, bh, '실행  ▶'),
-    upgrade: button(ctx, bx, 344, bw, bh, `업그레이드  (${save.fragments})`, { color: C.gold, size: 18 }),
-    achievements: button(ctx, bx, 402, bw, bh, `업적  ${done}/${ACHIEVEMENTS.length}`, { color: C.violet, size: 18 }),
-    help:    button(ctx, bx, 460, bw, bh, '조작법', { color: C.dim, size: 18 }),
+    start:   button(ctx, bx, 272, bw, bh, '실행  ▶'),
+    weapon:  button(ctx, bx, 328, bw, 44, `시작 무기: ${startDef.name}`,
+                    { color: startDef.color, size: 16 }),
+    upgrade: button(ctx, bx, 378, bw, 44, `업그레이드  (${save.fragments})`, { color: C.gold, size: 17 }),
+    achievements: button(ctx, bx, 428, bw, 44, `업적  ${done}/${ACHIEVEMENTS.length}`, { color: C.violet, size: 17 }),
+    help:    button(ctx, bx, 478, bw, 44, '조작법', { color: C.dim, size: 17 }),
   };
   // 모바일은 주소창이 화면을 갉아먹는다. 전체화면으로 들어갈 수단을 준다.
   if (IS_TOUCH && document.fullscreenEnabled) {
-    r.fullscreen = button(ctx, bx, 518, bw, 40,
-      document.fullscreenElement ? '전체화면 해제' : '전체화면', { color: C.dim, size: 16 });
+    r.fullscreen = button(ctx, bx, 528, bw, 38,
+      document.fullscreenElement ? '전체화면 해제' : '전체화면', { color: C.dim, size: 15 });
   }
 
   if (save.best.kills > 0) {
@@ -92,6 +95,63 @@ export function renderHelp(ctx) {
 }
 
 // ── 영구 업그레이드 ────────────────────────────────────────
+/** 시작 무기 해금 비용. 충격 파동은 기본 제공. */
+export const START_WEAPON_COST = 1200;
+
+/**
+ * 시작 무기 선택.
+ *
+ * startRun 은 원래부터 meta.startWeapon 을 읽고 있었는데 고를 수단이 없었다.
+ * 전부 공짜로 열어두면 초반 강도가 무기마다 크게 갈리므로(3초 처치 수가
+ * 충격 파동 80 vs 추적탄 12) 조각으로 하나씩 열게 했다.
+ */
+export function renderStartWeapon(ctx, save) {
+  dim(ctx, 0.85);
+  const pw = 820, ph = 560;
+  const px = (W - pw) / 2, py = (H - ph) / 2;
+  panel(ctx, px, py, pw, ph, C.cyan);
+
+  text(ctx, '시작 무기', px + pw / 2, py + 44, { size: 28, align: 'center', color: C.cyan, glow: 12 });
+  text(ctx, `보유 코드 조각  ${save.fragments}`, px + pw / 2, py + 70, { size: 15, align: 'center', color: C.text });
+
+  const result = { pick: null, buy: null, back: false };
+  const cw = (pw - 76) / 2, rowH = 62;
+  BASE_WEAPON_IDS.forEach((id, i) => {
+    const def = WEAPONS[id];
+    const col = i % 2, row = Math.floor(i / 2);
+    const x = px + 38 + col * (cw + 4);
+    const y = py + 96 + row * rowH;
+    const owned = save.unlockedWeapons.includes(id);
+    const chosen = save.startWeapon === id;
+
+    if (chosen) {
+      ctx.save();
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 4, y - 4, cw - 4, rowH - 6);
+      ctx.restore();
+    }
+    icon(ctx, def.icon, x + 22, y + 22, 15, owned ? def.color : C.dim);
+    text(ctx, def.name, x + 48, y + 14, { size: 16, color: owned ? C.text : C.dim });
+    text(ctx, def.blurb, x + 48, y + 34, { size: 11, color: C.dim });
+
+    const bw2 = 96;
+    const bx = x + cw - bw2 - 24;
+    if (chosen) {
+      text(ctx, '선택됨', bx + bw2 / 2, y + 26, { size: 14, align: 'center', color: def.color });
+    } else if (owned) {
+      if (button(ctx, bx, y + 6, bw2, 34, '선택', { size: 14 })) result.pick = id;
+    } else {
+      const afford = save.fragments >= START_WEAPON_COST;
+      if (button(ctx, bx, y + 6, bw2, 34, `${START_WEAPON_COST}`,
+          { size: 14, color: afford ? C.gold : '#5a4a20' }) && afford) result.buy = id;
+    }
+  });
+
+  result.back = button(ctx, px + pw / 2 - 80, py + ph - 54, 160, 40, '돌아가기', { size: 17 });
+  return result;
+}
+
 export function renderMeta(ctx, save) {
   dim(ctx, 0.85);
   // 항목이 9개다. 판을 키우고 줄을 좁혀 한 화면에 담는다
