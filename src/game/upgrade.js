@@ -88,7 +88,7 @@ function pendingEvolvePassives(p) {
     // 만렙 직전부터 띄운다. 만렙이 된 뒤엔 이미 슬롯이 차 있을 수 있다
     if (w.lv < MAX_LEVEL - 1) continue;
     if ((p.passives[def.evolveWith] || 0) >= 1) continue;
-    out.push({ id: def.evolveWith, weapon: def.name });
+    out.push({ id: def.evolveWith, weapon: def.name, to: def.evolveTo });
   }
   return out;
 }
@@ -105,7 +105,9 @@ export function buildChoices(p, count = 3) {
     pool.push({
       kind: 'evolve', id: ev.to, from: ev.from, weight: 100,
       name: def.name, color: def.color, icon: def.icon,
-      line1: '진화', line2: def.desc(def.levels[0]),
+      // 띠가 이미 "진 화"라고 말한다. 여기서는 무엇이 무엇으로 바뀌는지를 쓴다
+      line1: `${WEAPONS[ev.from].name} → ${def.name}`,
+      line2: def.desc(def.levels[0]),
     });
   }
 
@@ -148,11 +150,14 @@ export function buildChoices(p, count = 3) {
        * 플레이어는 막힌 줄도 모른 채 만렙만 찍고 기다리게 된다.
        */
       if (owned >= (p.maxPassives || MAX_PASSIVES) && !need) continue;
+      const evo = need ? WEAPONS[need.to] : null;
       pool.push({
         kind: 'passive_new', id, weight: need ? 70 : 9,
         name: def.name, color: def.color, icon: def.icon,
-        line1: need ? `${need.weapon} 진화 조건` : '신규 강화',
+        line1: evo ? `${need.weapon} → ${evo.name}` : '신규 강화',
         line2: def.blurb,
+        // 이게 붙은 카드는 진화 카드와 같은 대접을 받는다 (screens.js 가 읽는다)
+        evoReq: evo ? { name: evo.name, color: evo.color, icon: evo.icon } : null,
       });
     } else if (cur < MAX_LEVEL) {
       pool.push({
@@ -166,9 +171,22 @@ export function buildChoices(p, count = 3) {
   // 뽑을 게 남지 않았을 때의 보험
   if (pool.length === 0) return [consumable(0), consumable(1), consumable(2)];
 
+  /*
+   * ── 진화와 그 조건은 추첨에 맡기지 않는다 ──
+   *
+   * 가중치를 70까지 올려도 매 레벨업 79% 였다. 확률로 두면 플레이어는
+   * "안 뜬 것"과 "못 본 것"을 구분할 수 없다 — 실제로 만렙 무기를 들고
+   * 열 번 넘게 조건 카드를 지나친 판이 나왔다. 뜰 수 있으면 반드시 띄운다.
+   */
   const picked = [];
+  const rank = c => (c.kind === 'evolve' ? 2 : c.evoReq ? 1 : 0);
+  pool.sort((a, b) => rank(b) - rank(a));
+  while (picked.length < count && pool.length > 0 && rank(pool[0]) > 0) {
+    picked.push(pool.shift());
+  }
+
   const weights = pool.map(c => c.weight);
-  for (let i = 0; i < count && pool.length > 0; i++) {
+  for (let i = picked.length; i < count && pool.length > 0; i++) {
     const idx = weightedIndex(weights);
     picked.push(pool[idx]);
     pool.splice(idx, 1);

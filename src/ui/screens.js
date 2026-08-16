@@ -287,22 +287,55 @@ export function renderLevelUp(ctx, world, choices, anim) {
     const p = input.pointer;
     const hover = p.x >= x && p.x <= x + cw && p.y >= y && p.y <= y + ch;
     const isEvo = c.kind === 'evolve';
-    const border = isEvo ? C.gold : c.color;
+    /*
+     * 진화 조건 카드는 진화 카드와 같은 무게로 그린다.
+     *
+     * 예전에는 평범한 강화 카드에 조건을 작은 글씨로 한 줄 얹었을 뿐이었다.
+     * 그 자리는 다른 카드가 "Lv.3 → 4"를 쓰는 자리라 눈이 그냥 지나쳤고,
+     * 만렙 무기를 든 채로 조건 카드를 열 번 넘게 흘려보낸 판이 나왔다.
+     * 띠 + 금색 테두리 + "무엇이 되는지" 아이콘까지 붙여 못 지나치게 만든다.
+     */
+    const isReq = !!c.evoReq;
+    const gold = isEvo || isReq;
+    const border = gold ? C.gold : c.color;
 
     ctx.save();
     ctx.globalAlpha = ease;
     ctx.fillStyle = hover ? 'rgba(14,20,40,0.98)' : 'rgba(8,10,22,0.95)';
     ctx.fillRect(x, y, cw, ch);
     ctx.strokeStyle = border;
-    ctx.lineWidth = hover || isEvo ? 3 : 2;
+    ctx.lineWidth = hover || gold ? 3 : 2;
     ctx.shadowColor = border;
-    ctx.shadowBlur = hover ? 22 : isEvo ? 18 : 8;
+    ctx.shadowBlur = hover ? 22 : gold ? 18 : 8;
     ctx.strokeRect(x, y, cw, ch);
+    if (gold) {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = C.gold;
+      ctx.fillRect(x + 2, y + 2, cw - 4, 24);
+    }
     ctx.restore();
 
-    icon(ctx, c.icon, x + cw / 2, y + 78, 30, c.color);
+    if (gold) {
+      text(ctx, isEvo ? '진 화' : '진화 조건', x + cw / 2, y + 14, {
+        size: 14, align: 'center', baseline: 'middle', color: '#1c1405',
+        weight: 'bold', alpha: ease,
+      });
+    }
+
+    if (isReq) {
+      // 무엇을 집으면 무엇이 되는지를 그림으로 보여준다
+      icon(ctx, c.icon, x + cw / 2 - 42, y + 86, 24, c.color);
+      text(ctx, '→', x + cw / 2, y + 86, {
+        size: 20, align: 'center', baseline: 'middle', color: C.gold, alpha: ease,
+      });
+      icon(ctx, c.evoReq.icon, x + cw / 2 + 42, y + 86, 24, c.evoReq.color);
+    } else {
+      icon(ctx, c.icon, x + cw / 2, y + 78, 30, c.color);
+    }
     text(ctx, c.name, x + cw / 2, y + 152, { size: 22, align: 'center', color: C.text });
-    text(ctx, c.line1, x + cw / 2, y + 180, { size: 14, align: 'center', color: border });
+    text(ctx, c.line1, x + cw / 2, y + 180, {
+      size: 14, align: 'center', color: border, weight: isReq ? 'bold' : '',
+    });
 
     wrapText(ctx, c.line2, x + cw / 2, y + 214, cw - 40, 20, { size: 14, align: 'center', color: C.dim });
 

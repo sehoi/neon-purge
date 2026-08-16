@@ -117,6 +117,24 @@ function drawLoadout(ctx, p, rightX, yW, yP) {
     const def = WEAPONS[w.id];
     icon(ctx, def.icon, x, yW, size / 2, def.color);
     levelDots(ctx, x, yW + size / 2 + 3, w.lv, def.evolved ? 1 : MAX_LEVEL, def.color);
+    /*
+     * 만렙인데 조건 강화가 없어 진화가 막힌 무기.
+     * 무엇이 모자란지 여기서 상시로 보여준다 — 레벨업 카드가 뜰 때 처음 알면
+     * 그 한 장을 놓쳤을 때 왜 막혔는지 알 방법이 없다.
+     */
+    if (!def.evolved && def.evolveWith && w.lv >= MAX_LEVEL &&
+        !(p.passives[def.evolveWith] > 0)) {
+      // 오른쪽 위 모서리. 반지름 8 을 넘기면 옆 무기 아이콘을 덮는다 (간격 40, 반경 17)
+      const bx = x + size / 2 - 4, by = yW - size / 2 + 2;
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,8,18,0.96)';
+      disc(ctx, bx, by, 8);
+      ctx.strokeStyle = C.gold;
+      ctx.lineWidth = 1.5;
+      circle(ctx, bx, by, 8);
+      ctx.restore();
+      icon(ctx, PASSIVES[def.evolveWith].icon, bx, by, 5, C.gold);
+    }
     x -= size + gap;
   }
 
