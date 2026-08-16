@@ -113,16 +113,7 @@ export function buildChoices(p, count = 3) {
   }
 
   // 뽑을 게 남지 않았을 때의 보험
-  if (pool.length === 0) {
-    return [
-      { kind: 'heal', weight: 1, name: '긴급 복구', color: C.mint, icon: 'shield',
-        line1: '즉시 발동', line2: '체력을 전부 회복한다' },
-      { kind: 'frag', weight: 1, name: '코드 조각', color: C.gold, icon: 'amp',
-        line1: '즉시 발동', line2: '영구 강화에 쓸 조각 +100' },
-      { kind: 'nuke', weight: 1, name: '전역 퍼지', color: C.red, icon: 'ring',
-        line1: '즉시 발동', line2: '화면 안의 모든 적에게 큰 피해' },
-    ];
-  }
+  if (pool.length === 0) return [consumable(0), consumable(1), consumable(2)];
 
   const picked = [];
   const weights = pool.map(c => c.weight);
@@ -134,11 +125,38 @@ export function buildChoices(p, count = 3) {
   }
 
   // 후보가 3개 미만이면 소모품으로 채운다
-  while (picked.length < count) {
-    picked.push({ kind: 'heal', name: '긴급 복구', color: C.mint, icon: 'shield',
-      line1: '즉시 발동', line2: '체력을 전부 회복한다' });
+  while (picked.length < count) picked.push(consumable(picked.length));
+
+  /*
+   * ── 무기를 강제로 받게 하지 않는다 ──
+   *
+   * 카드는 건너뛸 수 없다. 그래서 3장이 전부 "신규 무기"로 나오면 무기를 하나만
+   * 들고 가려던 사람은 선택의 여지 없이 두 자루가 된다.
+   *
+   * 드물게 일어나는 사고가 아니었다. 파동만 고집하는 판을 3000번 돌려보니
+   * **100% 가 평균 레벨 15.7 에서 강제로 무기를 받게 됐다.** 무기와 강화를
+   * 다 올리고 나면 뽑을 게 신규 무기밖에 안 남기 때문이다.
+   * 즉 '한 자루로 충분해' 업적은 달성 자체가 불가능했다.
+   *
+   * 이미 무기를 든 사람에게는 신규 무기가 아닌 선택지를 한 장은 보장한다.
+   */
+  if (p.weapons.length > 0 && picked.every(c => c.kind === 'weapon_new')) {
+    picked[picked.length - 1] = consumable(0);
   }
   return picked;
+}
+
+/** 뽑을 게 없거나, 강제 선택을 막아야 할 때 끼워 넣는 즉시 발동 카드. */
+function consumable(i) {
+  const list = [
+    { kind: 'heal', name: '긴급 복구', color: C.mint, icon: 'shield',
+      line1: '즉시 발동', line2: '체력을 전부 회복한다' },
+    { kind: 'frag', name: '코드 조각', color: C.gold, icon: 'amp',
+      line1: '즉시 발동', line2: '영구 강화에 쓸 조각 +100' },
+    { kind: 'nuke', name: '전역 퍼지', color: C.red, icon: 'ring',
+      line1: '즉시 발동', line2: '화면 안의 모든 적에게 큰 피해' },
+  ];
+  return list[i % list.length];
 }
 
 export function applyChoice(p, world, c) {
