@@ -202,10 +202,10 @@ const API = {
     return r;
   },
 
-  spawnBeam(angle, spin, dmg, life, slot, color) {
+  spawnBeam(angle, spin, dmg, life, slot, color, width = 7) {
     const b = this.beams.spawn();
     b.angle = angle; b.spin = spin; b.dmg = dmg;
-    b.slot = slot; b.color = color;
+    b.slot = slot; b.color = color; b.width = width;
     b.maxLife = b.life = life;
     return b;
   },
@@ -244,18 +244,18 @@ const API = {
   },
 
   // ── 무기 보조 ────────────────────────────────────────────
-  chainZap(dmg, bounces, slot) {
+  chainZap(dmg, bounces, slot, area = 1, color = '#6bc8ff') {
     const p = this.player;
     let from = p;
     const visited = [];
-    let cur = this.nearestEnemy(p.x, p.y, 400);
+    let cur = this.nearestEnemy(p.x, p.y, 400 * area);
     for (let i = 0; i <= bounces && cur; i++) {
-      zapLine(from.x, from.y, cur.x, cur.y, '#6bc8ff');
+      zapLine(from.x, from.y, cur.x, cur.y, color);
       this.damageEnemy(cur, dmg, 0, 0);
       visited.push(cur);
       from = cur;
       // 이미 맞은 적을 제외하고 다음 대상 탐색
-      let next = null, bestD = 260 * 260;
+      let next = null, bestD = (260 * area) * (260 * area);
       this.enemies.forEach(e => {
         if (visited.includes(e)) return;
         const d = dist2(from.x, from.y, e.x, e.y);
@@ -460,16 +460,17 @@ function updateWeapons(world, dt) {
     const def = WEAPONS[w.id];
     const L = def.levels[Math.min(w.lv, def.levels.length) - 1];
     const dmg = L.dmg * st.dmgMul;
+    const area = st.areaMul;
 
     if (def.continuous) {
-      def.sustain(world, w, L, dmg, dt);
+      def.sustain(world, w, L, dmg, dt, area);
       continue;
     }
     w.timer -= dt;
     if (w.timer <= 0) {
       w.timer += L.cd * st.cdMul;
       if (w.timer < 0) w.timer = L.cd * st.cdMul;
-      def.fire(world, w, L, dmg);
+      def.fire(world, w, L, dmg, area);
     }
   }
 }
@@ -615,7 +616,7 @@ function updateBeams(world, dt) {
     world.enemies.forEach(e => {
       const dx = e.x - p.x, dy = e.y - p.y;
       const perp = Math.abs(-sa * dx + ca * dy);
-      if (perp > e.r + 7) return;
+      if (perp > e.r + (b.width || 7)) return;
       if (dist2(e.x, e.y, p.x, p.y) > 1000 * 1000) return;
       if (!world.canHit(e, b.slot, 0.25)) return;
       world.damageEnemy(e, b.dmg, 0, 0);

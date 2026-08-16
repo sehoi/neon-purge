@@ -1,6 +1,9 @@
 // 무기 테이블.
-// fire()는 "월드에 무엇을 스폰할지"만 정한다. 쿨다운·데미지 배율 적용은 game/weapon.js 공통 처리.
+// fire()는 "월드에 무엇을 스폰할지"만 정한다. 쿨다운·데미지 배율 적용은 공통 처리.
 // continuous 무기는 fire 대신 sustain(dt)로 매 프레임 갱신된다.
+//
+// fire/sustain 의 마지막 인자 area 는 출력 증폭이 주는 범위 배율이다.
+// 반경·사거리·굵기처럼 "닿는 넓이"에만 곱하고, 개수나 속도에는 곱하지 않는다.
 
 import { C } from '../config.js';
 
@@ -18,8 +21,8 @@ export const WEAPONS = {
       { dmg: 25, radius: 165, cd: 0.85 },
     ],
     desc: L => `데미지 ${L.dmg} · 반경 ${L.radius}`,
-    fire(world, w, L, dmg) {
-      world.spawnRing(world.player.x, world.player.y, dmg, L.radius, w.slot, C.cyan);
+    fire(world, w, L, dmg, area = 1) {
+      world.spawnRing(world.player.x, world.player.y, dmg, L.radius * area, w.slot, C.cyan);
       world.sfx('pulse');
     },
   },
@@ -36,7 +39,7 @@ export const WEAPONS = {
       { dmg: 22, count: 4, cd: 0.45, spd: 540 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.count}발`,
-    fire(world, w, L, dmg) {
+    fire(world, w, L, dmg, area = 1) {
       const p = world.player;
       const target = world.nearestEnemy(p.x, p.y, 900);
       let base;
@@ -48,7 +51,7 @@ export const WEAPONS = {
         const off = (i - (L.count - 1) / 2) * 0.13;
         const a = base + off;
         world.spawnBolt(p.x, p.y, Math.cos(a) * L.spd, Math.sin(a) * L.spd,
-          dmg, w.slot, { r: 5, color: '#7dff9e', life: 1.6 });
+          dmg, w.slot, { r: 5 * area, color: '#7dff9e', life: 1.6 });
       }
       world.sfx('shoot');
     },
@@ -69,14 +72,15 @@ export const WEAPONS = {
       { dmg: 20, count: 4, radius: 95, spin: 5.0 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.count}개`,
-    sustain(world, w, L, dmg, dt) {
-      world.syncOrbitals(w.slot, L.count, L.radius, dmg, L.spin, dt, C.gold, false);
+    sustain(world, w, L, dmg, dt, area = 1) {
+      world.syncOrbitals(w.slot, L.count, L.radius * area, dmg, L.spin, dt, C.gold, false);
     },
   },
 
   chain: {
     id: 'chain', name: '연쇄 방전', color: '#6bc8ff', icon: 'chain',
     blurb: '적에서 적으로 튀는 번개. 뭉칠수록 강하다',
+    evolveWith: 'cache', evolveTo: 'thunder',
     levels: [
       { dmg: 14, bounces: 2, cd: 1.60 },
       { dmg: 17, bounces: 3, cd: 1.45 },
@@ -85,14 +89,15 @@ export const WEAPONS = {
       { dmg: 26, bounces: 6, cd: 1.00 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.bounces}회 연쇄`,
-    fire(world, w, L, dmg) {
-      world.chainZap(dmg, L.bounces, w.slot);
+    fire(world, w, L, dmg, area = 1) {
+      world.chainZap(dmg, L.bounces, w.slot, area);
     },
   },
 
   laser: {
     id: 'laser', name: '관통 빔', color: C.red, icon: 'laser',
     blurb: '화면을 가로지르며 천천히 회전한다',
+    evolveWith: 'wall', evolveTo: 'grid',
     levels: [
       { dmg: 20, beams: 1, cd: 3.0, spin: 0.9, life: 1.6 },
       { dmg: 24, beams: 1, cd: 2.7, spin: 1.0, life: 1.8 },
@@ -101,10 +106,10 @@ export const WEAPONS = {
       { dmg: 34, beams: 3, cd: 2.0, spin: 1.3, life: 2.0 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.beams}줄`,
-    fire(world, w, L, dmg) {
+    fire(world, w, L, dmg, area = 1) {
       const base = Math.random() * Math.PI;
       for (let i = 0; i < L.beams; i++) {
-        world.spawnBeam(base + (i / L.beams) * Math.PI, L.spin, dmg, L.life, w.slot, C.red);
+        world.spawnBeam(base + (i / L.beams) * Math.PI, L.spin, dmg, L.life, w.slot, C.red, 7 * area);
       }
       world.sfx('shoot');
     },
@@ -116,8 +121,8 @@ export const WEAPONS = {
     blurb: '화면을 삼키는 파동. 적을 멀리 밀어낸다',
     levels: [{ dmg: 40, radius: 320, cd: 1.1 }],
     desc: L => `데미지 ${L.dmg} · 반경 ${L.radius} · 넉백`,
-    fire(world, w, L, dmg) {
-      world.spawnRing(world.player.x, world.player.y, dmg, L.radius, w.slot, '#ffffff', true);
+    fire(world, w, L, dmg, area = 1) {
+      world.spawnRing(world.player.x, world.player.y, dmg, L.radius * area, w.slot, '#ffffff', true);
       world.shake(10);
       world.sfx('emp');
     },
@@ -128,7 +133,7 @@ export const WEAPONS = {
     blurb: '한 줄에 선 적을 전부 꿰뚫는다',
     levels: [{ dmg: 66, count: 3, cd: 0.5, spd: 900 }],
     desc: L => `데미지 ${L.dmg} · 관통 · ${L.count}발`,
-    fire(world, w, L, dmg) {
+    fire(world, w, L, dmg, area = 1) {
       const p = world.player;
       const target = world.nearestEnemy(p.x, p.y, 1200);
       const base = target ? Math.atan2(target.y - p.y, target.x - p.x)
@@ -136,7 +141,7 @@ export const WEAPONS = {
       for (let i = 0; i < L.count; i++) {
         const a = base + (i - (L.count - 1) / 2) * 0.1;
         world.spawnBolt(p.x, p.y, Math.cos(a) * L.spd, Math.sin(a) * L.spd,
-          dmg, w.slot, { r: 7, color: '#c8ffd8', life: 1.4, pierce: true, hitCd: 0.4 });
+          dmg, w.slot, { r: 7 * area, color: '#c8ffd8', life: 1.4, pierce: true, hitCd: 0.4 });
       }
       world.sfx('shoot');
     },
@@ -148,8 +153,41 @@ export const WEAPONS = {
     continuous: true,
     levels: [{ dmg: 34, count: 5, radius: 110, spin: 6.0 }],
     desc: L => `데미지 ${L.dmg} · ${L.count}개 · 연결 전류`,
-    sustain(world, w, L, dmg, dt) {
-      world.syncOrbitals(w.slot, L.count, L.radius, dmg, L.spin, dt, '#fff2a8', true);
+    sustain(world, w, L, dmg, dt, area = 1) {
+      world.syncOrbitals(w.slot, L.count, L.radius * area, dmg, L.spin, dt, '#fff2a8', true);
+    },
+  },
+
+  /*
+   * 연쇄 방전과 관통 빔에는 진화가 없었다 — 5종 중 3종만 있었다.
+   * 남은 강화(데이터 흡인·자가 복구)와 짝지어 채운다.
+   */
+  thunder: {
+    id: 'thunder', name: '뇌우', color: '#b8e6ff', icon: 'chain', evolved: true,
+    blurb: '한 번에 화면 절반을 훑는 번개',
+    levels: [{ dmg: 44, bounces: 16, cd: 0.85 }],
+    desc: L => `데미지 ${L.dmg} · ${L.bounces}회 연쇄 · 사거리 2배`,
+    fire(world, w, L, dmg, area = 1) {
+      // 진화 이름값을 하려면 튀는 거리도 같이 늘어야 한다
+      world.chainZap(dmg, L.bounces, w.slot, area * 2, '#b8e6ff');
+      world.shake(4);
+      world.sfx('emp');
+    },
+  },
+
+  grid: {
+    id: 'grid', name: '빔 격자', color: '#ff9a6b', icon: 'laser', evolved: true,
+    blurb: '여섯 줄이 격자로 돌며 화면을 썬다',
+    levels: [{ dmg: 52, beams: 6, cd: 2.2, spin: 1.8, life: 3.4 }],
+    desc: L => `데미지 ${L.dmg} · ${L.beams}줄 · 굵고 오래간다`,
+    fire(world, w, L, dmg, area = 1) {
+      const base = Math.random() * Math.PI;
+      for (let i = 0; i < L.beams; i++) {
+        world.spawnBeam(base + (i / L.beams) * Math.PI, L.spin, dmg, L.life, w.slot,
+          '#ff9a6b', 14 * area);
+      }
+      world.shake(5);
+      world.sfx('shoot');
     },
   },
 };

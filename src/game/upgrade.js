@@ -14,6 +14,15 @@ export function recalcStats(p, meta) {
   const lv = id => p.passives[id] || 0;
 
   const dmgMul  = (1 + lv('amp') * PASSIVES.amp.per) * (1 + m.core * 0.04);
+  /*
+   * 출력 증폭은 범위도 같이 넓힌다.
+   *
+   * 피해량만 올리면 잡몹 구간에서 아무 값도 못 한다 — 어차피 한 방에 죽어서
+   * 남는 피해가 전부 버려지기 때문이다(실측: 90초 처치 수 447 → 471, 오차 범위).
+   * 범위가 같이 늘면 한 번에 더 많은 적을 닿게 해서, 과잉 처치 구간에서도
+   * 값을 한다. 무엇보다 **눈에 보인다** — 체감이 안 되던 진짜 이유가 이것이다.
+   */
+  const areaMul = 1 + lv('amp') * PASSIVES.amp.area;
   const cdMul   = Math.max(0.35, 1 - lv('clock') * PASSIVES.clock.per);
   const maxHp   = PLAYER_BASE.maxHp + lv('wall') * PASSIVES.wall.per + m.memory * 10;
   const regen   = lv('wall') * 0.4;
@@ -23,7 +32,7 @@ export function recalcStats(p, meta) {
   const dashCd  = PLAYER_BASE.dashCd * (1 - lv('over') * 0.08);
 
   const prevMax = p.stats ? p.stats.maxHp : maxHp;
-  p.stats = { dmgMul, cdMul, maxHp, regen, magnet, xpMul, speed, dashCd };
+  p.stats = { dmgMul, areaMul, cdMul, maxHp, regen, magnet, xpMul, speed, dashCd };
 
   // 최대 체력이 늘어난 만큼 현재 체력도 같이 올려준다 (방화벽을 찍고 손해 보는 느낌 방지)
   if (maxHp > prevMax) p.hp += maxHp - prevMax;

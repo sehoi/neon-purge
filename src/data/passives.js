@@ -8,7 +8,7 @@ import { C } from '../config.js';
 export const PASSIVES = {
   amp: {
     id: 'amp', name: '출력 증폭', color: C.red, icon: 'amp',
-    blurb: '모든 무기의 피해량이 오른다',
+    blurb: '모든 무기의 피해량과 범위가 오른다',
     /*
      * 0.08 이었는데 "체감이 안 된다"는 지적을 받고 재봤다.
      *
@@ -22,7 +22,9 @@ export const PASSIVES = {
      * 잡몹에 아무 값도 못 하는 대신 단단한 적에게 확실한 값을 하는 자리로 뒀다.
      */
     per: 0.11,
-    desc: lv => `피해량 +${Math.round(lv * 11)}%`,
+    /** 범위 계수. 피해량만으로는 잡몹 구간에서 값을 못 해서 같이 넓힌다. */
+    area: 0.05,
+    desc: lv => `피해량 +${Math.round(lv * 11)}% · 범위 +${Math.round(lv * 5)}%`,
   },
   clock: {
     id: 'clock', name: '클럭 가속', color: C.cyan, icon: 'clock',
