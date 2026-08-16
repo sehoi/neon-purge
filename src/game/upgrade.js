@@ -72,6 +72,28 @@ function evolvables(p) {
 }
 
 /**
+ * 진화를 눈앞에 둔 무기가 요구하는 강화 목록.
+ *
+ * 강화 슬롯은 4칸인데 종류는 5개다. 다른 넷으로 채워버리면 필요한 강화를
+ * 영영 못 뽑고, 그 무기는 진화 자체가 불가능해진다 — 실제로 관통 빔/기뢰가
+ * 요구하는 '자가 복구'가 그렇게 막혔다(진화 우선 플레이에서도 500판 중 43판 실패).
+ *
+ * 만렙 무기가 요구하는 강화는 가중치를 크게 올려 앞에 세운다.
+ */
+function pendingEvolvePassives(p) {
+  const out = [];
+  for (const w of p.weapons) {
+    const def = WEAPONS[w.id];
+    if (!def.evolveWith || def.evolved) continue;
+    // 만렙 직전부터 띄운다. 만렙이 된 뒤엔 이미 슬롯이 차 있을 수 있다
+    if (w.lv < MAX_LEVEL - 1) continue;
+    if ((p.passives[def.evolveWith] || 0) >= 1) continue;
+    out.push({ id: def.evolveWith, weapon: def.name });
+  }
+  return out;
+}
+
+/**
  * 카드 3장을 뽑는다. 중복 없음.
  * 진화 카드는 가중치 ×10 으로 거의 확정 등장시킨다.
  */
@@ -98,24 +120,39 @@ export function buildChoices(p, count = 3) {
         line1: '신규 무기', line2: def.blurb,
       });
     } else if (cur < MAX_LEVEL) {
+      // 만렙 직전이면 진화에 무엇이 필요한지 미리 알려준다.
+      // 조건을 모르면 슬롯을 다 채운 뒤에야 막힌 걸 알게 된다.
+      const hint = cur === MAX_LEVEL - 1 && def.evolveWith && !def.evolved
+        ? `Lv.5 + ${PASSIVES[def.evolveWith].name} → ${WEAPONS[def.evolveTo].name}`
+        : def.desc(def.levels[cur]);
       pool.push({
         kind: 'weapon_up', id, weight: 12,
         name: def.name, color: def.color, icon: def.icon,
-        line1: `Lv.${cur} → ${cur + 1}`, line2: def.desc(def.levels[cur]),
+        line1: `Lv.${cur} → ${cur + 1}`, line2: hint,
       });
     }
   }
 
+  const pending = pendingEvolvePassives(p);
   for (const id of PASSIVE_IDS) {
     const def = PASSIVES[id];
     const cur = p.passives[id] || 0;
     const owned = Object.keys(p.passives).length;
+    const need = pending.find(x => x.id === id);
     if (cur === 0) {
-      if (owned >= (p.maxPassives || MAX_PASSIVES)) continue;
+      /*
+       * 진화에 필요한 강화만 슬롯 상한을 한 칸 넘길 수 있다.
+       *
+       * 상한은 빌드에 성격을 주려고 있는 것이지, 진화를 영영 막으려고 있는 게
+       * 아니다. 슬롯 넷이 다른 강화로 차면 그 무기는 진화 자체가 불가능해지는데,
+       * 플레이어는 막힌 줄도 모른 채 만렙만 찍고 기다리게 된다.
+       */
+      if (owned >= (p.maxPassives || MAX_PASSIVES) && !need) continue;
       pool.push({
-        kind: 'passive_new', id, weight: 9,
+        kind: 'passive_new', id, weight: need ? 70 : 9,
         name: def.name, color: def.color, icon: def.icon,
-        line1: '신규 강화', line2: def.blurb,
+        line1: need ? `${need.weapon} 진화 조건` : '신규 강화',
+        line2: def.blurb,
       });
     } else if (cur < MAX_LEVEL) {
       pool.push({
