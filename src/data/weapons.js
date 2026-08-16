@@ -64,21 +64,26 @@ export const WEAPONS = {
 
   orbit: {
     id: 'orbit', name: '궤도 노드', color: C.gold, icon: 'orbit',
-    blurb: '주위를 돌며 닿는 적을 태운다',
+    blurb: '바깥을 도는 방어선. 다가오는 것을 먼저 친다',
     continuous: true,
     evolveWith: 'over', evolveTo: 'ionbelt',
-    // 회전이 느리면 이동 중에 "도는 것"으로 안 보이고 그냥 붙어다니는 점이 된다.
-    // 한 바퀴 2.6초는 너무 굼떠서 전체적으로 올렸다.
+    /*
+     * 반경이 70~95 였다. 충격 파동(105~165) 보다 **안쪽**이라 파동에 이미 죽은
+     * 자리를 한 번 더 도는 꼴이었다 — 그래서 약하고 구분도 안 됐다.
+     * 파동 바깥으로 빼서 역할을 갈랐다. 파동은 붙은 것을 쓸고,
+     * 궤도는 다가오는 것을 미리 친다. 피해량도 같이 올렸다.
+     */
     levels: [
-      { dmg: 10, count: 1, radius: 70, spin: 3.6 },
-      { dmg: 13, count: 2, radius: 76, spin: 3.9 },
-      { dmg: 15, count: 3, radius: 84, spin: 4.2 },
-      { dmg: 18, count: 3, radius: 90, spin: 4.6 },
-      { dmg: 20, count: 4, radius: 95, spin: 5.0 },
+      { dmg: 18, count: 2, radius: 175, spin: 3.2 },
+      { dmg: 23, count: 3, radius: 190, spin: 3.4 },
+      { dmg: 28, count: 4, radius: 205, spin: 3.6 },
+      { dmg: 34, count: 5, radius: 218, spin: 3.8 },
+      { dmg: 42, count: 6, radius: 232, spin: 4.0 },
     ],
     desc: L => `데미지 ${L.dmg} · ${L.count}개`,
     sustain(world, w, L, dmg, dt, area = 1) {
-      world.syncOrbitals(w.slot, L.count, L.radius * area, dmg, L.spin, dt, C.gold, false);
+      // 점만 돌면 사이로 다 새어 들어온다. 노드를 이어 선으로 만든다
+      world.syncOrbitals(w.slot, L.count, L.radius * area, dmg, L.spin, dt, C.gold, true);
     },
   },
 
@@ -153,24 +158,29 @@ export const WEAPONS = {
   },
 
   /*
-   * 감전 장판 — 몸 주위를 상시 지진다.
-   * 궤도 노드가 "도는 점"이라면 이쪽은 "붙어 있는 면". 붙는 적을 알아서 녹인다.
+   * 기뢰 — 지나온 자리에 두고 온다.
+   *
+   * 감전 장판을 여기 있던 자리에서 들어냈다. 몸 주위 상시 피해라 충격 파동과
+   * 역할이 겹치는데 반경은 더 짧아, 초반이든 후반이든 파동의 열화판이었다.
+   * 설치형은 결이 완전히 다르다 — 쫓기며 흘리고 지나가면 뒤가 정리된다.
    */
-  field: {
-    id: 'field', name: '감전 장판', color: '#8be9ff', icon: 'field',
-    blurb: '몸 주위를 계속 지진다. 붙는 적이 알아서 녹는다',
-    continuous: true,
-    evolveWith: 'wall', evolveTo: 'aegis',
+  mine: {
+    id: 'mine', name: '기뢰', color: '#ffb347', icon: 'mine',
+    blurb: '지나온 자리에 두고 온다. 쫓기며 싸울수록 강하다',
+    evolveWith: 'wall', evolveTo: 'minefield',
     levels: [
-      { dmg: 14, radius: 92,  tick: 0.5 },
-      { dmg: 17, radius: 104, tick: 0.46 },
-      { dmg: 21, radius: 116, tick: 0.42 },
-      { dmg: 25, radius: 130, tick: 0.38 },
-      { dmg: 30, radius: 146, tick: 0.34 },
+      { dmg: 30, radius: 78,  cd: 1.30, life: 7 },
+      { dmg: 38, radius: 86,  cd: 1.15, life: 8 },
+      { dmg: 46, radius: 95,  cd: 1.02, life: 9 },
+      { dmg: 56, radius: 104, cd: 0.92, life: 10 },
+      { dmg: 68, radius: 115, cd: 0.82, life: 11 },
     ],
-    desc: L => `초당 ${Math.round(L.dmg / L.tick)} · 반경 ${L.radius}`,
-    sustain(world, w, L, dmg, dt, area = 1) {
-      world.zapField(w, L.radius * area, dmg, L.tick, dt, '#8be9ff');
+    desc: L => `데미지 ${L.dmg} · 폭발 반경 ${L.radius}`,
+    fire(world, w, L, dmg, area = 1) {
+      const p = world.player;
+      // 진행 방향 반대편에 떨군다 — 쫓아오는 쪽에 깔린다
+      world.spawnMine(p.x - p.faceX * 26, p.y - p.faceY * 26,
+        dmg, L.radius * area, L.life, w.slot, '#ffb347');
     },
   },
 
@@ -210,7 +220,7 @@ export const WEAPONS = {
     id: 'ionbelt', name: '전류 결계', color: '#fff2a8', icon: 'orbit', evolved: true,
     blurb: '노드를 잇는 전류가 몸을 감싼다',
     continuous: true,
-    levels: [{ dmg: 34, count: 5, radius: 110, spin: 6.0 }],
+    levels: [{ dmg: 82, count: 8, radius: 205, spin: 4.6 }],
     desc: L => `데미지 ${L.dmg} · ${L.count}개 · 연결 전류`,
     sustain(world, w, L, dmg, dt, area = 1) {
       world.syncOrbitals(w.slot, L.count, L.radius * area, dmg, L.spin, dt, '#fff2a8', true);
@@ -254,14 +264,15 @@ export const WEAPONS = {
     },
   },
 
-  aegis: {
-    id: 'aegis', name: '방전 결계', color: '#d6f7ff', icon: 'field', evolved: true,
-    blurb: '몸을 감싼 결계가 닿는 것을 전부 태운다',
-    continuous: true,
-    levels: [{ dmg: 58, radius: 210, tick: 0.28 }],
-    desc: L => `초당 ${Math.round(L.dmg / L.tick)} · 반경 ${L.radius}`,
-    sustain(world, w, L, dmg, dt, area = 1) {
-      world.zapField(w, L.radius * area, dmg, L.tick, dt, '#d6f7ff');
+  minefield: {
+    id: 'minefield', name: '연쇄 기뢰', color: '#ffd98a', icon: 'mine', evolved: true,
+    blurb: '한 발이 터지면 옆의 것도 같이 터진다',
+    levels: [{ dmg: 120, radius: 190, cd: 0.55, life: 14 }],
+    desc: L => `데미지 ${L.dmg} · 반경 ${L.radius} · 연쇄 폭발`,
+    fire(world, w, L, dmg, area = 1) {
+      const p = world.player;
+      world.spawnMine(p.x - p.faceX * 26, p.y - p.faceY * 26,
+        dmg, L.radius * area, L.life, w.slot, '#ffd98a', true);
     },
   },
 
@@ -282,5 +293,5 @@ export const WEAPONS = {
   },
 };
 
-export const BASE_WEAPON_IDS = ['pulse', 'tracer', 'orbit', 'chain', 'laser', 'shard', 'field'];
+export const BASE_WEAPON_IDS = ['pulse', 'tracer', 'orbit', 'chain', 'laser', 'shard', 'mine'];
 export const MAX_WEAPONS = 4;

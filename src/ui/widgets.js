@@ -101,15 +101,13 @@ export function icon(ctx, kind, x, y, r, color) {
         disc(ctx, x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8, r * 0.18);
       }
       break;
-    case 'field':
-      // 가운데 점을 둘러싼 끊어진 고리 — 충격 파동(ring)의 이중 원과 구분된다
-      disc(ctx, x, y, r * 0.28);
+    case 'mine':
+      // 가운데 원 + 밖으로 뻗은 뿔 — 바닥에 깔아두는 것으로 읽힌다
+      circle(ctx, x, y, r * 0.45);
       for (let i = 0; i < 6; i++) {
-        const a0 = (i / 6) * Math.PI * 2 + 0.12;
-        const a1 = a0 + Math.PI / 4.2;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.85, a0, a1);
-        ctx.stroke();
+        const a = (i / 6) * Math.PI * 2 + 0.26;
+        line(ctx, x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5,
+                  x + Math.cos(a) * r * 0.95, y + Math.sin(a) * r * 0.95);
       }
       break;
     case 'orbit':

@@ -93,7 +93,7 @@ export function renderWorld(ctx, world) {
   drawEnemies(ctx, world, visible);
   drawEnemyShots(ctx, world, visible);
   drawPlayerAttacks(ctx, world, visible);
-  drawFields(ctx, world);
+  drawMines(ctx, world, visible);
   drawPlayer(ctx, world);
   drawParticles(ctx, visible);
   drawCine(ctx, world);
@@ -200,19 +200,31 @@ function drawPickups(ctx, world, visible) {
  * 보스 연출. 등장에는 조여드는 고리를, 처치에는 퍼지는 섬광을 그린다.
  * 월드가 멈춰 있는 동안 화면에 아무 일도 안 일어나면 멎은 것처럼 보인다.
  */
-/** 감전 장판 — 플레이어를 감싼 고리. 어디까지 닿는지 보여야 붙이고 뗄 수 있다. */
-function drawFields(ctx, world) {
-  const p = world.player;
-  for (const w of p.weapons) {
-    if (!w.fieldR) continue;
-    neon(ctx, w.fieldColor || C.cyan, 2, () => circle(ctx, p.x, p.y, w.fieldR));
-    ctx.globalAlpha = 0.06;
-    ctx.fillStyle = w.fieldColor || C.cyan;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, w.fieldR, 0, TAU);
-    ctx.fill();
+/**
+ * 기뢰. 무장 전에는 흐리게, 무장 뒤에는 맥동한다.
+ * 언제부터 터지는지 보이지 않으면 "깔아두고 도망친다"를 계획할 수 없다.
+ */
+function drawMines(ctx, world, visible) {
+  world.mines.forEach(m => {
+    if (!visible(m)) return;
+    const armed = m.armed <= 0;
+    const pulse = armed ? 0.75 + 0.25 * Math.sin(world.t * 9) : 0.35;
+    ctx.globalAlpha = pulse;
+    neon(ctx, m.color, armed ? 2.5 : 1.5, () => {
+      circle(ctx, m.x, m.y, m.r);
+      if (armed) circle(ctx, m.x, m.y, m.r + 5);
+    });
+    // 수명이 얼마 안 남으면 폭발 반경을 미리 보여준다
+    if (m.life < 1.2) {
+      ctx.globalAlpha = 0.18 * (m.life / 1.2);
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, m.radius, 0, TAU);
+      ctx.stroke();
+    }
     ctx.globalAlpha = 1;
-  }
+  });
 }
 
 function drawCine(ctx, world) {

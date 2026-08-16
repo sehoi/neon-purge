@@ -44,7 +44,7 @@ function makeBolt() {
 }
 
 function makeRing() {
-  return { x: 0, y: 0, r: 0, maxR: 100, dmg: 0, slot: 0,
+  return { x: 0, y: 0, r: 0, maxR: 100, dmg: 0, slot: 0, hitCd: 0.4,
            color: '#fff', life: 0, maxLife: 0.35, knock: false, alive: false };
 }
 
@@ -55,6 +55,11 @@ function makeBeam() {
 
 function makeShot() {
   return { x: 0, y: 0, vx: 0, vy: 0, r: 6, dmg: 0, life: 0, alive: false };
+}
+
+function makeMine() {
+  return { x: 0, y: 0, r: 10, dmg: 0, radius: 80, life: 0, maxLife: 8,
+           slot: 0, color: '#ffb347', chain: false, armed: 0, alive: false };
 }
 
 function makePickup() {
@@ -72,6 +77,7 @@ export function createWorld(meta) {
     rings:      createPool(makeRing, 40),
     beams:      createPool(makeBeam, 12),
     enemyShots: createPool(makeShot, 300),
+    mines:      createPool(makeMine, 60),
     pickups:    createPool(makePickup, 600),
     grid: createGrid(GRID_CELL),
     spawner: createSpawner(),
@@ -141,6 +147,7 @@ export function startRun(world) {
   world.rings.clear();
   world.beams.clear();
   world.enemyShots.clear();
+  world.mines.clear();
   world.pickups.clear();
   world.orbGroups.clear();
   world.orbPhase.clear();
@@ -163,6 +170,9 @@ export function startRun(world) {
   // 레벨만 올라가고 고를 기회가 없으면 산 의미가 없다.
   world.pendingLevelUps = world.meta.prefetch || 0;
 }
+
+// 연쇄 폭발이 서로를 무한히 부르지 않도록 깊이를 센다
+let _chainDepth = 0;
 
 const API = {
   sfx(name) { playSfx(name); },
@@ -204,12 +214,19 @@ const API = {
     return b;
   },
 
-  spawnRing(x, y, dmg, maxR, slot, color, knock = false) {
+  /**
+   * @param hitCd 같은 적을 다시 때리기까지의 간격.
+   *   기본 0.4 는 파동처럼 주기적으로 터지는 것에 맞춘 값이다. 연쇄 기뢰처럼
+   *   여러 폭발이 한꺼번에 겹치는 무기는 이 값이 크면 서로를 잡아먹는다 —
+   *   실제로 연쇄 기뢰가 기본 기뢰보다 느렸다.
+   */
+  spawnRing(x, y, dmg, maxR, slot, color, knock = false, hitCd = 0.4) {
     const r = this.rings.spawn();
     r.x = x; r.y = y; r.r = 8; r.maxR = maxR;
     r.dmg = dmg; r.slot = slot; r.color = color;
     r.maxLife = r.life = 0.35;
     r.knock = knock;
+    r.hitCd = hitCd;
     return r;
   },
 
@@ -226,6 +243,48 @@ const API = {
     s.x = x; s.y = y; s.vx = vx; s.vy = vy;
     s.dmg = dmg; s.r = 6; s.life = 6;
     return s;
+  },
+
+  /**
+   * 기뢰. 잠깐 뜸을 들인 뒤(armed) 닿는 적에게 터진다.
+   * 즉시 터지면 던지는 순간 붙어 있던 적에게 바로 맞아 설치형이 아니라
+   * 그냥 근접 폭발이 된다 — 뜸이 있어야 "깔아두고 도망친다"가 성립한다.
+   */
+  spawnMine(x, y, dmg, radius, life, slot, color, chain = false) {
+    const m = this.mines.spawn();
+    m.x = x; m.y = y;
+    m.dmg = dmg; m.radius = radius;
+    m.maxLife = m.life = life;
+    m.slot = slot; m.color = color; m.chain = chain;
+    m.armed = 0.35;
+    m.r = 10;
+    return m;
+  },
+
+  detonateMine(m) {
+    if (!m.alive) return;
+    m.alive = false;
+    this.spawnRing(m.x, m.y, m.dmg, m.radius, m.slot, m.color, false, m.chain ? 0.1 : 0.3);
+    burst(m.x, m.y, m.color, 9, 240, 5);
+    addShake(3);
+    this.sfx('boom');
+    /*
+     * 연쇄 기뢰: 폭발 반경 안의 다른 기뢰도 곧바로 터진다.
+     *
+     * 처음엔 armed 를 0.05 로 낮추는 식으로 짰는데, 이미 무장된 기뢰는
+     * armed 가 음수라 Math.min 이 아무 일도 하지 않았다. 연쇄가 사실상 없어서
+     * 진화형이 기본형보다 느렸다(7.1초 vs 2.4초). 직접 터뜨린다.
+     */
+    if (m.chain) {
+      _chainDepth++;
+      if (_chainDepth < 12) {
+        this.mines.forEach(o => {
+          if (o === m || !o.alive || !o.chain) return;
+          if (dist2(o.x, o.y, m.x, m.y) < m.radius * m.radius) this.detonateMine(o);
+        });
+      }
+      _chainDepth--;
+    }
   },
 
   spawnPickup(x, y, kind, value) {
@@ -427,30 +486,6 @@ const API = {
     }
   },
 
-  /**
-   * 몸 주위 상시 피해 장판.
-   *
-   * 궤도 노드가 "도는 점"이라 사이가 비는 것과 달리 빈틈이 없다. 대신 반경이
-   * 짧아 붙는 적만 잡는다 — 파고드는 적을 알아서 녹이는 자리다.
-   *
-   * tick 간격으로만 판정한다. 매 프레임 때리면 초당 60번이라 수치가 무의미해지고
-   * 판정 비용도 그만큼 든다.
-   */
-  zapField(w, radius, dmg, tick, dt, color) {
-    w.fieldTimer = (w.fieldTimer || 0) - dt;
-    w.fieldR = radius;
-    w.fieldColor = color;
-    if (w.fieldTimer > 0) return;
-    w.fieldTimer += tick;
-    if (w.fieldTimer < 0) w.fieldTimer = tick;
-
-    const p = this.player;
-    _fieldWorld = this; _fieldR = radius; _fieldDmg = dmg;
-    _fieldSlot = w.slot; _fieldColor = color; _fieldX = p.x; _fieldY = p.y;
-    this.grid.query(p.x, p.y, radius + 40, _fieldHitCb);
-    this.sfx('hit');
-  },
-
   showBanner(text) {
     this.banner = { text, life: 3.0 };
   },
@@ -486,6 +521,7 @@ export function updateWorld(world, dt) {
   world.enemies.forEach(e => world.grid.insert(e));
 
   updateEnemies(world, dt);
+  updateMines(world, dt);
   updateBolts(world, dt);
   updateRings(world, dt);
   updateBeams(world, dt);
@@ -500,6 +536,7 @@ export function updateWorld(world, dt) {
   world.rings.compact();
   world.beams.compact();
   world.enemyShots.compact();
+  world.mines.compact();
   world.pickups.compact();
 
   if (!p.alive) world.over = true;
@@ -558,19 +595,6 @@ function _boltHitCb(e) {
   if (!b.pierce) { b.alive = false; _hitDone = true; }
 }
 
-// 장판 판정. 인라인 클로저를 만들지 않으려고 컨텍스트를 모듈 변수로 넘긴다.
-let _fieldWorld = null, _fieldR = 0, _fieldDmg = 0, _fieldSlot = 0;
-let _fieldColor = '', _fieldX = 0, _fieldY = 0;
-
-function _fieldHitCb(e) {
-  if (!e.alive) return;
-  const d2 = dist2(_fieldX, _fieldY, e.x, e.y);
-  const reach = _fieldR + e.r;
-  if (d2 > reach * reach) return;
-  _fieldWorld.damageEnemy(e, _fieldDmg, 0, 0);
-  flash(e.x, e.y, _fieldColor, 12);
-}
-
 let _ringCur = null;
 
 function _ringHitCb(e) {
@@ -580,7 +604,7 @@ function _ringHitCb(e) {
   const outer = r.r + e.r;
   const inner = Math.max(0, r.r - e.r - 30);
   if (d2 > outer * outer || d2 < inner * inner) return;
-  if (!_hitWorld.canHit(e, r.slot, 0.4)) return;
+  if (!_hitWorld.canHit(e, r.slot, r.hitCd || 0.4)) return;
   const d = Math.sqrt(d2) || 1;
   const k = r.knock ? 340 : 60;
   _hitWorld.damageEnemy(e, r.dmg, ((e.x - r.x) / d) * k, ((e.y - r.y) / d) * k);
@@ -742,6 +766,28 @@ function updateOrbitals(world, dt) {
   world.forEachOrbital(o => {
     _orbCur = o;
     world.grid.query(o.x, o.y, o.r + 30, _orbHitCb);
+  });
+}
+
+let _mineWorld = null, _mineCur = null, _mineHit = false;
+
+function _mineTouchCb(e) {
+  if (_mineHit || !e.alive) return;
+  const m = _mineCur;
+  if (dist2(m.x, m.y, e.x, e.y) > (m.r + e.r) * (m.r + e.r)) return;
+  _mineHit = true;
+}
+
+function updateMines(world, dt) {
+  _mineWorld = world;
+  world.mines.forEach(m => {
+    m.life -= dt;
+    if (m.armed > 0) m.armed -= dt;
+    if (m.life <= 0) { world.detonateMine(m); return; }
+    if (m.armed > 0) return;
+    _mineCur = m; _mineHit = false;
+    world.grid.query(m.x, m.y, m.r + 40, _mineTouchCb);
+    if (_mineHit) world.detonateMine(m);
   });
 }
 
