@@ -358,9 +358,14 @@ const API = {
       let remaining = 0;
       this.enemies.forEach(o => { if (o !== e && (o.def.elite || o.def.boss)) remaining++; });
       if (remaining === 0) this.eventLock = false;
-    } else {
-      addHitstop(0.012);
     }
+    /*
+     * 잡몹 처치에는 히트스톱을 주지 않는다.
+     *
+     * 0.012초는 한 프레임보다 짧아 한 마리로는 체감되지도 않는데, 후반에는
+     * 초당 수십 마리가 죽으면서 매 프레임 다시 걸린다. 얻는 것 없이 끊김만 남았다.
+     * 타격감은 엘리트·보스(0.12초)와 피격(0.05초)에서만 낸다.
+     */
 
     // 드랍. def.xp 는 "그 적이 주는 총 경험치"다.
     // 픽업의 겉모습은 값에서 자동으로 정해진다 — 강한 적이 더 큰 조각을 떨어뜨리는 게
