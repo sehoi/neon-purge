@@ -160,6 +160,7 @@ function endRun(victory) {
     revived: world.runStats.revived,
     evolvedCount: p.weapons.filter(w => WEAPONS[w.id].evolved).length,
     maxWeapons: p.maxWeapons || 4,
+    bossTime: world.runStats.bossTime,
   };
   const unlocked = evaluateAchievements(ctxRun, save.achievements);
   save.achievements.push(...unlocked);

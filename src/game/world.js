@@ -82,7 +82,7 @@ export function createWorld(meta) {
     kills: 0,
     bonusFragments: 0,
     // 업적 판정용 런 요약. endRun 에서 읽는다.
-    runStats: { hitsTaken: 0, revived: false },
+    runStats: { hitsTaken: 0, revived: false, bossStart: 0, bossTime: 0 },
     hpScale: 1,
     dmgScale: 1,
     eventLock: false,
@@ -150,6 +150,8 @@ export function startRun(world) {
   world.bonusFragments = 0;
   world.runStats.hitsTaken = 0;
   world.runStats.revived = false;
+  world.runStats.bossStart = 0;
+  world.runStats.bossTime = 0;
   world.eventLock = false;
   world.boss = null;
   world.cine = null;
@@ -350,6 +352,8 @@ const API = {
       addHitstop(0.12);
       if (e.def.boss) {
         // 승리 판정은 연출이 끝난 뒤에 낸다. 바로 결과창이 뜨면 이긴 순간을 못 본다
+        this.runStats.bossTime = this.runStats.bossStart
+          ? this.t - this.runStats.bossStart : 0;
         this.cine = { kind: 'out', t: 0, dur: 2.6, x: e.x, y: e.y, color: e.def.color };
         this.boss = null;
       }
@@ -621,6 +625,7 @@ function stepCine(world, dt) {
     if (k >= 1) {
       if (b) { b.frozen = false; b.invuln = false; b.spawnScale = 1; }
       world.cine = null;
+      world.runStats.bossStart = world.t;   // 여기서부터가 진짜 보스전이다
       world.showBanner('정화 개시');
       addShake(20);
       world.sfx('emp');

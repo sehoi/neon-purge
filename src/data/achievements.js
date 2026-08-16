@@ -53,8 +53,14 @@ export const ACHIEVEMENTS = [
     check: c => c.hitsTaken === 0 && c.time >= 300,
   },
   {
-    id: 'speedrun', name: '속전속결', desc: '9분 안에 클리어한다', reward: 1000,
-    check: c => c.victory && c.time <= 540,
+    /*
+     * '9분 안에 클리어'는 달성 자체가 불가능했다.
+     * 보스는 10분(600초)에 등장하므로 승리 시각이 600초보다 이를 수가 없다.
+     * 조건을 "보스전 자체를 얼마나 빨리 끝냈는가"로 바꾼다 —
+     * 원래 의도했던 '속전속결'에 오히려 더 맞는다.
+     */
+    id: 'speedrun', name: '속전속결', desc: '보스를 30초 안에 처치한다', reward: 1000,
+    check: c => c.victory && c.bossTime > 0 && c.bossTime <= 30,
   },
   {
     id: 'phoenix', name: '재기동', desc: '부활한 뒤 그 판을 클리어한다', reward: 600,
